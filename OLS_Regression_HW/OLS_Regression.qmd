@@ -1,0 +1,1132 @@
+---
+title: "MUSA 5000 Homework I"
+author: "Tess Vu, Jun Luu, Alex Stauffer"
+date: today
+output: html_document
+---
+
+# 1. Introduction
+
+The task is to explore the relationship between median house values and various neighborhood characteristics using Philadelphia data at the Census block group level. (Literature review on impact predictors have on response variable)
+
+------------------------------------------------------------------------
+
+# 2. Methods
+
+## Data Cleaning
+
+The original Philadelphia block group data set had 1,816 observations. The data was cleaned by removing the following block groups:
+
+```         
+1) Block groups where population < 40
+2) Block groups where there are no housing units
+3) Block groups where the median house value is lower than $10,000
+4) One North Philadelphia block group which had a very high median house value (over 800,000 USD) and a very low median household income (less than 8,000 USD)
+```
+
+The final data set that was tested consists of 1,720 block groups.
+
+## Exploratory Data Analysis
+
+Our purpose is to examine the summary statistics and distributions of variables. As part of our exploratory data analysis, the correlations between the predictors are examined as well.
+
+A correlation coefficient is a statistical measure that quantifies the strength and direction of the relationship between two variables. It is calculated as the sum of the products of each observation’s deviation from the mean of variable x and the mean of variable y, divided by the product of the standard deviations of both variables.
+
+$$
+r = \frac{\sum (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum (x_i - \bar{x})^2 \sum (y_i - \bar{y})^2}}
+$$ *r* can take on ranges from -1 to 1, and r = 0 meaning there is no linear relationship. Explain that *r* ranges from -1 to 1, and r = 0 means no linear relationship.
+
+## Multiple Regression Analysis
+
+(Explain what regression does; write the model equation below with your variable names.)
+
+$$
+\log(\text{Median Home Value}) = \beta_0 + \beta_1(\text{Poverty}) + \beta_2(\text{Education}) + \beta_3(\text{Vacancy}) + \beta_4(\text{Single Units}) + \varepsilon
+$$
+
+Describe β’s, ε, and the assumptions (linearity, independence, normality, homoscedasticity, no multicollinearity).\
+Include the OLS estimation formula and R² and adjusted R² formulas.
+
+## Additional Analyses
+
+(Briefly describe stepwise regression and 5-fold cross-validation — their purpose, how RMSE is calculated.)
+
+## Software
+
+All analyses were conducted in R Studio 2025.09.1+401 using R language version 4.5.1.
+
+------------------------------------------------------------------------
+
+# 3. Results
+
+## Exploratory Results
+
+-   Include **summary statistics table** (the one you just made with `kable`).
+
+```{r}
+# Import relevant libraries.
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(cowplot)
+library(sf)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+
+# No scientific notation.
+options(scipen = 999)
+
+# Read .csv file and store.
+regress_data <- read.csv("RegressionData.csv")
+
+# Turn to tibble.
+regress_data <- as_tibble(regress_data)
+```
+
+```{r}
+mean_MEDHVAL <- mean(regress_data[["MEDHVAL"]])
+sd_MEDHVAL <- sd(regress_data[["MEDHVAL"]])
+
+mean_PCTBACHMOR <- mean(regress_data[["PCTBACHMOR"]])
+sd_PCTBACHMOR <- sd(regress_data[["PCTBACHMOR"]])
+
+mean_NBELPOV100 <- mean(regress_data[["NBELPOV100"]])
+sd_NBELPOV100 <- sd(regress_data[["NBELPOV100"]])
+
+mean_PCTVACANT <- mean(regress_data[["PCTVACANT"]])
+sd_PCTVACANT <- sd(regress_data[["PCTVACANT"]])
+
+mean_PCTSINGLES <- mean(regress_data[["PCTSINGLES"]])
+sd_PCTSINGLES <- sd(regress_data[["PCTSINGLES"]])
+```
+
+```{r}
+# Create data frame for summary statistics table.
+sum_stats_table <- data.frame(VARIABLE = c("DEPENDENT VARIABLE", "Median House Value",
+                                           "PREDICTORS", "# Households in Poverty",
+                                           "% Individuals w/ Bachelor's Degrees or Higher",
+                                           "% Vacant Houses", "% Single House Units"))
+
+# Input mean values.
+sum_stats_table$MEAN <- c("", sprintf("%.2f", mean_MEDHVAL), "", sprintf("%.2f", mean_NBELPOV100),
+                          sprintf("%.2f", mean_PCTBACHMOR), sprintf("%.2f", mean_PCTVACANT), sprintf("%.2f", mean_PCTSINGLES))
+
+# Input standard deviation values.
+sum_stats_table$SD <- c("", sprintf("%.2f", sd_MEDHVAL), "", sprintf("%.2f", sd_NBELPOV100),
+                        sprintf("%.2f", sd_PCTBACHMOR), sprintf("%.2f", sd_PCTVACANT), sprintf("%.2f", sd_PCTSINGLES))
+
+kable(sum_stats_table, digits = 2,
+      caption = "<b>SUMMARY STATISTICS</b>",
+      align = c("r", "c", "c"),
+      format.args = list(big.mark = ",", nsmall = 2)
+      ) %>%
+  kable_styling(latex_options = "striped") %>%
+  column_spec(1, bold = TRUE) %>%
+  row_spec(0, color = "white", background = "black")
+```
+
+-   Describe variable distributions and transformations.
+
+All the variables' means and standard deviations are close together, with the bachelor's degree variable having a standard deviation higher than the mean. The data could be very inconsistent, because the standard deviations are as high or higher than the means this indicates the values fluctuate; this suggests there's a significant disparity in house values in the area. The average is influenced by outliers, so the data is dispersed far from the mean, it could be that the median would be best representative of the typical value in the area. It's possible the distribution *might not* be a normal, symmetrical bell curve.
+
+-   Insert **histograms** (before and after log-transform).
+
+```{r}
+# Add new columns at end of tibble dataframe that takes the natural logarithm of median house value (y, response variable) and its x, or predictor variables.
+regress_data <- regress_data %>%
+  mutate(
+    "LNMEDHVAL" = log(MEDHVAL), # No zero values, can use normal log function.
+    # Below have 0 values, use log function adding 1.
+    "LNPCTBACHMORE" = log(1 + PCTBACHMOR),
+    "LNNBELPOV100" = log(1 + NBELPOV100),
+    "LNPCTVACANT" = log(1 + PCTVACANT),
+    "LNPCTSINGLES" = log(1 + PCTSINGLES)
+  )
+```
+
+```{r}
+#| message: false
+#| warning: false
+# Histogram of median household value
+medhval_histogram <- ggplot(regress_data, aes(x = MEDHVAL)) +
+  geom_histogram(fill = "blue2", color = "white") +
+  scale_x_continuous(labels = scales::dollar_format(prefix = "$", big.mark = ",")) +
+  labs(
+    title = "Histogram of Median Household Value",
+    x = "Median Household Value (Dollars, $)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Histogram of log-transformed values
+lnmedhval_histogram <- ggplot(regress_data, aes(x = LNMEDHVAL)) +
+  geom_histogram(fill = "orange2", color = "white") +
+  labs(
+    title = "Histogram of Log(Median Household Value)",
+    x = "Log(Median Household Value)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Combine side by side
+grid.arrange(medhval_histogram, lnmedhval_histogram, ncol = 2)
+```
+
+```{r}
+#| message: false
+#| warning: false
+# Histogram of percent bachelor's degrees or more.
+pctbachmor_histogram <- ggplot(regress_data, aes(x = PCTBACHMOR)) +
+  geom_histogram(fill = "blue2", color = "white") +
+  scale_x_continuous(labels = scales::label_percent(scale = 1, big.mark = ",")) +
+  labs(
+    title = "Histogram of Percent Bachelor's+ Degrees",
+    x = "Percent Bachelor's+ Degrees (Percent, %)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Histogram of log-transformed values.
+lnpctbachmor_histogram <- ggplot(regress_data, aes(x = LNPCTBACHMORE)) +
+  geom_histogram(fill = "orange2", color = "white") +
+  labs(
+    title = "Histogram of Log(Percent Bachelor's+ Degrees)",
+    x = "Log(Percent Bachelor's+ Degrees)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Combine side by side
+grid.arrange(pctbachmor_histogram, lnpctbachmor_histogram, ncol = 2)
+```
+
+```{r}
+#| message: false
+#| warning: false
+# Histogram of number of households in poverty.
+nbelpov_histogram <- ggplot(regress_data, aes(x = NBELPOV100)) +
+  geom_histogram(fill = "blue2", color = "white") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(
+    title = "Histogram of Number of Households in Poverty",
+    x = "Number of Households in Poverty",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Histogram of log-transformed values.
+lnbelpov_histogram <- ggplot(regress_data, aes(x = LNNBELPOV100)) +
+  geom_histogram(fill = "orange2", color = "white") +
+  labs(
+    title = "Histogram of Log(Number of Households in Poverty)",
+    x = "Log(Number of Households in Poverty)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Combine side by side
+grid.arrange(nbelpov_histogram, lnbelpov_histogram, ncol = 2)
+```
+
+```{r}
+#| message: false
+#| warning: false
+# Histogram of percent vacancies.
+pctbachmor_histogram <- ggplot(regress_data, aes(x = PCTVACANT)) +
+  geom_histogram(fill = "blue2", color = "white") +
+  scale_x_continuous(labels = scales::label_percent(scale = 1, big.mark = ",")) +
+  labs(
+    title = "Histogram of Percent Vacancies",
+    x = "Percent Vacancies (Percent, %)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Histogram of log-transformed values.
+lnpctbachmor_histogram <- ggplot(regress_data, aes(x = LNPCTVACANT)) +
+  geom_histogram(fill = "orange2", color = "white") +
+  labs(
+    title = "Histogram of Log(Percent Vacancies)",
+    x = "Log(Percent Vacancies)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Combine side by side
+grid.arrange(pctbachmor_histogram, lnpctbachmor_histogram, ncol = 2)
+```
+
+```{r}
+#| message: false
+#| warning: false
+# Histogram of percent detached single house units.
+pctbachmor_histogram <- ggplot(regress_data, aes(x = PCTSINGLES)) +
+  geom_histogram(fill = "blue2", color = "white") +
+  scale_x_continuous(labels = scales::label_percent(scale = 1, big.mark = ",")) +
+  labs(
+    title = "Histogram of Percent Detached Homes",
+    x = "Percent Detached Homes (Percent, %)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Histogram of log-transformed values.
+lnpctbachmor_histogram <- ggplot(regress_data, aes(x = LNPCTSINGLES)) +
+  geom_histogram(fill = "orange2", color = "white") +
+  labs(
+    title = "Histogram of Log(Percent Detached Homes)",
+    x = "Log(Percent Vacancies)",
+    y = "Count"
+  ) +
+  theme_minimal(base_family = "Times New Roman") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(face = "italic", size = 10),
+    axis.title.y = element_text(face = "italic", size = 10)
+  )
+
+# Combine side by side
+grid.arrange(pctbachmor_histogram, lnpctbachmor_histogram, ncol = 2)
+```
+
+Other regression assumptions will be examined in a separate section below in "Regression Assumption Checks".
+
+-   Insert **choropleth maps** for each variable and interpret patterns.
+
+```{r}
+shapefile <- st_read("Lecture_1_RegressionData.shp/RegressionData.shp")
+
+choropleth_LNMEDHVAL <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = LNMEDHVAL), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(title = "Philadelphia Tracts: Log of Median House Value", fill = "Log of Median House Value") +
+  theme_void()
+
+choropleth_PCTVACANT <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = PCTVACANT), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "% Vacant Units") +
+  theme_void()
+
+choropleth_PCTSINGLES <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = PCTSINGLES), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "% Detached Single-Family Homes") +
+  theme_void()
+
+choropleth_PCTBACHMOR <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = PCTBACHMOR), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "% Bachelor's Degrees") +
+  theme_void()
+
+choropleth_LNNBELPOV100 <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = LNNBELPOV), color = "black", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "Households in Poverty") +
+  theme_void()
+
+plots_combined <- plot_grid(choropleth_PCTVACANT, choropleth_PCTSINGLES, choropleth_PCTBACHMOR, choropleth_LNNBELPOV100, ncol = 2, nrow = 2)
+
+plots_combined + plot_annotation(
+  title = "Philadelphia Tracts",
+  subtitle = "Median House Value Predictors"
+  )
+
+#ggsave("choropleth_combined_map.png", plot = plots_combined, width = 14, height = 8.5, units = "in", dpi = 300)
+
+plots_combined
+```
+
+**Observations:**
+
+- House values are much higher in northwest Philadelphia, likely because it's a suburb and encompasses Wissahickon Valley Park's vast green space, and proximity to greenery tends to increase property values in neighborhoods.
+
+- Looks like there are more vacant units clustered in northern Philadelphia, which many local Philadelphians anecdotally state possesses high rates of low-income populations and communities in poverty. Can see a similar gradient, although less stark, in southwest Philadelphia and the Mantua neighborhood in west Philadelphia.
+
+- Less rowhouse architecture in the periphery of Philadelphia, which seems to spatially coincide with the visual that displays the natural log of median household values. The city is majorly connected rowhouses or apartment buildings.
+
+- High concentrations of those with a bachelor's degree or more residing in Center City, Wissahickon, and University City areas, as well as the northwestern part of the county on the west side of the Schuylkill River that leads toward Bryn Mawr.
+
+- Many households in poverty seem to encompass areas that don't have detached single-family homes. Lots of noticeable clusters in north, west, and south Philadelphia.
+
+-   Add **correlation matrix** and interpret possible multicollinearity.
+
+
+
+## Regression Results
+
+-   Insert regression output (`summary(mod1)`).
+-   Interpret coefficients, R², p-values, and F-statistic.
+
+## Regression Assumption Checks
+
+-   Show scatterplots between dependent variable and predictors.
+
+```{r}
+# Scatter plot of ln(percent bachelor's degrees) vs. ln(median house value).
+plot_LNPCTBACHMORE <- ggplot(regress_data, aes(x = LNPCTBACHMORE, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Percent Bachelor's Degree vs. Median House Value",
+       x = "Percent Bachelor's Degree",
+       y = "Median House Value") +
+  theme_gray()
+
+# Scatter plot of ln(number households in poverty) vs. ln(median house value).
+plot_LNNBELPOV100 <- ggplot(regress_data, aes(x = LNNBELPOV100, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Number Households in Poverty vs. Median House Value",
+       x = "Number Households in Poverty",
+       y = "Median House Value") +
+  theme_gray()
+
+# Scatter plot of ln(percent vacant units) vs. ln(median house value).
+plot_LNPCTVACANT <- ggplot(regress_data, aes(x = LNPCTVACANT, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Percent Vacant Units vs. Median House Value",
+       x = "Percent Vacant Units",
+       y = "Median House Value") +
+  theme_gray()
+
+# Scatter plot of ln(detached single-family homes) vs. ln(median house value).
+plot_LNPCTSINGLES <- ggplot(regress_data, aes(x = LNPCTSINGLES, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Percent Detached Single-Family Homes vs. Median House Value",
+       x = "Percent Detached Single-Family Homes",
+       y = "Median House Value") +
+  theme_gray()
+
+# Create combined scatter plots with 2 rows and 2 columns.
+plots_combined <- plot_grid(plot_LNPCTBACHMORE, plot_LNNBELPOV100, plot_LNPCTVACANT, plot_LNPCTSINGLES, ncol = 2, nrow = 2)
+
+# Display plots with annotation.
+plots_combined + plot_annotation(
+  title = "NATURAL LOG: Median House Value Predictors",
+  subtitle = "Using % Bachelor's Degrees, # Households Below Poverty,\n% Vacant Units, % Detached Single-Family Homes"
+  )
+```
+
+-   Plot residual histogram and residuals vs predicted values.
+-   Discuss heteroscedasticity, normality, and independence.
+-   Map standardized residuals and interpret possible spatial autocorrelation.
+
+## Additional Models
+
+-   Insert results of **stepwise regression**.
+-   Insert results of **5-fold cross-validation**, and compare RMSE between models.
+
+------------------------------------------------------------------------
+
+# 4. Discussion and Limitations
+
+(Summarize key findings, discuss which predictors were significant, model strength, any assumption violations, and data limitations.\
+Discuss potential use of Ridge/LASSO regression, when appropriate.)
+
+------------------------------------------------------------------------
+
+# OLS REGRESSION
+
+## 1. EXPLORATORY DATA ANALYSIS
+
+Import the file RegressionData.csv into R using the `read.csv` command.
+
+```{r}
+# Import relevant libraries.
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(cowplot)
+library(sf)
+library(knitr)
+library(kableExtra)
+
+# No scientific notation.
+options(scipen = 999)
+
+# Read .csv file and store.
+regress_data <- read.csv("RegressionData.csv")
+
+# Turn to tibble.
+regress_data <- as_tibble(regress_data)
+
+regress_data
+```
+
+**1a.** Using the `hist`, `mean`, and `sd` commands in R, examine the distribution of the dependent variable, **MEDHVAL**, and predictors **PCTBACHMORE**, **NBELPOV100**, **PCTVACANT**, and **PCTSINGLES**, and calculate the mean and standard deviation of each of these variables.
+
+```{r}
+# Histogram, mean, and standard deviation of median household value.
+hist(regress_data[["MEDHVAL"]],
+     main = "Histogram of Median Household Value",
+     xlab = "Median Household Value (Dollars, $)",
+     axes = FALSE)
+
+axis(side = 1,
+     at = axTicks(1),
+     labels = paste0("$", prettyNum(axTicks(1), big.mark = ",")))
+
+axis(side = 2,
+     at = axTicks(2),
+     labels = prettyNum(axTicks(2), big.mark = ","))
+
+mean_MEDHVAL <- mean(regress_data[["MEDHVAL"]])
+mean_MEDHVAL
+
+sd_MEDHVAL <- sd(regress_data[["MEDHVAL"]])
+sd_MEDHVAL
+```
+
+```{r}
+# Histogram, mean, and standard deviation of percent bachelor's degrees.
+hist(regress_data[["PCTBACHMOR"]],
+     main = "Histogram of Percent Bachelor's Degrees",
+     xlab = "Bachelor's Degrees (Percent, %)",
+     axes = FALSE)
+
+axis(side = 1,
+     at = axTicks(1),
+     labels = paste0(prettyNum(axTicks(1), big.mark = ","), "%"))
+
+axis(side = 2,
+     at = axTicks(2),
+     labels = prettyNum(axTicks(2), big.mark = ","))
+
+mean_PCTBACHMOR <- mean(regress_data[["PCTBACHMOR"]])
+mean_PCTBACHMOR
+
+sd_PCTBACHMOR <- sd(regress_data[["PCTBACHMOR"]])
+sd_PCTBACHMOR
+```
+
+```{r}
+# Histogram, mean, and standard deviation of number households in poverty.
+hist(regress_data[["NBELPOV100"]],
+     main = "Histogram of Households in Poverty",
+     xlab = "Households in Poverty",
+     axes = FALSE)
+
+axis(side = 1,
+     at = axTicks(1),
+     labels = paste0(prettyNum(axTicks(1), big.mark = ",")))
+
+axis(side = 2,
+     at = axTicks(2),
+     labels = prettyNum(axTicks(2), big.mark = ","))
+
+mean_NBELPOV100 <- mean(regress_data[["NBELPOV100"]])
+mean_NBELPOV100
+
+sd_NBELPOV100 <- sd(regress_data[["NBELPOV100"]])
+sd_NBELPOV100
+```
+
+```{r}
+# Histogram, mean, and standard deviation of percent vacant units.
+hist(regress_data[["PCTVACANT"]],
+     main = "Histogram of Percent Vacant Units",
+     xlab = "Vacant Units (Percent, %)",
+     axes = FALSE)
+
+axis(side = 1,
+     at = axTicks(1),
+     labels = paste0(prettyNum(axTicks(1), big.mark = ","), "%"))
+
+axis(side = 2,
+     at = axTicks(2),
+     labels = prettyNum(axTicks(2), big.mark = ","))
+
+mean_PCTVACANT <- mean(regress_data[["PCTVACANT"]])
+mean_PCTVACANT
+
+sd_PCTVACANT <- sd(regress_data[["PCTVACANT"]])
+sd_PCTVACANT
+```
+
+```{r}
+# Histogram, mean, and standard deviation of percent detached single-family homes.
+hist(regress_data[["PCTSINGLES"]],
+     main = "Histogram of Percent Detached Single-Family Homes",
+     xlab = "Detached Single-Family Homes (Percent, %)",
+     axes = FALSE)
+
+axis(side = 1,
+     at = axTicks(1),
+     labels = paste0(prettyNum(axTicks(1), big.mark = ","), "%"))
+
+axis(side = 2,
+     at = axTicks(2),
+     labels = prettyNum(axTicks(2), big.mark = ","))
+
+mean_PCTSINGLES <- mean(regress_data[["PCTSINGLES"]])
+mean_PCTSINGLES
+
+sd_PCTSINGLES <- sd(regress_data[["PCTSINGLES"]])
+sd_PCTSINGLES
+```
+
+**Observations:** All the variables' means and standard deviations are close together, with the bachelor's degree variable having a standard deviation higher than the mean. The data could be very inconsistent, because the standard deviations are as high or higher than the means this indicates the values fluctuate; this suggests there's a significant disparity in house values in the area. The average is influenced by outliers, so the data is dispersed far from the mean, it could be that the median would be best representative of the typical value in the area. It's possible the distribution *might not* be a normal, symmetrical bell curve.
+
+**1ai.** Using the results you obtain, present the summary statistics (i.e., mean and standard deviation) of each of the variables in a table.
+
+```{r}
+# Median house value.
+regress_data %>% summarize(
+  mean_MEDHVAL = mean_MEDHVAL,
+  median_MEDHVAL = median(regress_data[["MEDHVAL"]]),
+  sd_MEDHVAL = sd_MEDHVAL,
+  min_MEDHVAL = min(regress_data[["MEDHVAL"]]),
+  max_MEDHVAL = max(regress_data[["MEDHVAL"]])
+  )
+```
+
+```{r}
+# Percent bachelor's degrees.
+regress_data %>% summarize(
+  mean_PCTBACHMOR = mean_PCTBACHMOR,
+  median_PCTBACHMOR = median(regress_data[["PCTBACHMOR"]]),
+  sd_PCTBACHMOR = sd_PCTBACHMOR,
+  min_PCTBACHMOR = min(regress_data[["PCTBACHMOR"]]),
+  max_PCTBACHMOR = max(regress_data[["PCTBACHMOR"]])
+  )
+```
+
+```{r}
+# Number households in poverty.
+regress_data %>% summarize(
+  mean_NBELPOV100 = mean_NBELPOV100,
+  median_NBELPOV100 = median(regress_data[["NBELPOV100"]]),
+  sd_NBELPOV100 = sd_NBELPOV100,
+  min_NBELPOV100 = min(regress_data[["NBELPOV100"]]),
+  max_NBELPOV100 = max(regress_data[["NBELPOV100"]])
+  )
+```
+
+```{r}
+# Percent vacant units.
+regress_data %>% summarize(
+  mean_PCTVACANT = mean_PCTVACANT,
+  median_PCTVACANT = median(regress_data[["PCTVACANT"]]),
+  sd_PCTVACANT = sd_PCTVACANT,
+  min_PCTVACANT = min(regress_data[["PCTVACANT"]]),
+  max_PCTVACANT = max(regress_data[["PCTVACANT"]])
+  )
+```
+
+```{r}
+# Percent detached single-family homes.
+regress_data %>% summarize(
+  mean_PCTSINGLES = mean_PCTSINGLES,
+  median_PCTSINGLES = median(regress_data[["PCTSINGLES"]]),
+  sd_PCTSINGLES = sd_PCTSINGLES,
+  min_PCTSINGLES = min(regress_data[["PCTSINGLES"]]),
+  max_PCTSINGLES = max(regress_data[["PCTSINGLES"]])
+  )
+```
+
+```{r}
+# Create data frame for summary statistics table.
+sum_stats_table <- data.frame(VARIABLE = c("DEPENDENT VARIABLE", "Median House Value",
+                                           "PREDICTORS", "# Households in Poverty",
+                                           "% Individuals w/ Bachelor's Degrees or Higher",
+                                           "% Vacant Houses", "% Single House Units"))
+
+# Input mean values.
+sum_stats_table$MEAN <- c("", sprintf("%.2f", mean_MEDHVAL), "", sprintf("%.2f", mean_NBELPOV100),
+                          sprintf("%.2f", mean_PCTBACHMOR), sprintf("%.2f", mean_PCTVACANT), sprintf("%.2f", mean_PCTSINGLES))
+
+# Input standard deviation values.
+sum_stats_table$SD <- c("", sprintf("%.2f", sd_MEDHVAL), "", sprintf("%.2f", sd_NBELPOV100),
+                        sprintf("%.2f", sd_PCTBACHMOR), sprintf("%.2f", sd_PCTVACANT), sprintf("%.2f", sd_PCTSINGLES))
+
+kable(sum_stats_table, digits = 2,
+      caption = "<b>SUMMARY STATISTICS</b>",
+      align = c("r", "c", "c"),
+      format.args = list(big.mark = ",", nsmall = 2)
+      ) %>%
+  kable_styling(latex_options = "striped") %>%
+  column_spec(1, bold = TRUE) %>%
+  row_spec(0, color = "white", background = "black")
+```
+
+**1aii.** Also, observe from the histograms that none of the variables looks normal. This being the case, examine whether a logarithmic transformation of the variable helps achieve a normal distribution. In R, use the `log` command to create 5 new variables called **LNMEDHVAL**, **LNPCTBACHMORE**, **LNNBELPOV100**, **LNPCTVACANT**, and **LNPCTSINGLES**, which are the natural logs of **MEDHVAL**, **PCBACHMORE**, **NBELPOV100**, **PCTVACANT**, and **PCTSINGLES**, respectively.
+
+```{r}
+# Add new columns at end of tibble dataframe that takes the natural logarithm of median house value (y, response variable) and its x, or predictor variables.
+regress_data <- regress_data %>%
+  mutate(
+    "LNMEDHVAL" = log(MEDHVAL), # No zero values, can use normal log function.
+    # Below have 0 values, use log function adding 1.
+    "LNPCTBACHMORE" = log(1 + PCTBACHMOR),
+    "LNNBELPOV100" = log(1 + NBELPOV100),
+    "LNPCTVACANT" = log(1 + PCTVACANT),
+    "LNPCTSINGLES" = log(1 + PCTSINGLES)
+  )
+
+regress_data
+```
+
+**1b.** Look at whether the relationship between the dependent variable and each of the predictors is linear. To do so, create four scatter plots – one for each predictor using the `plot` command (or any other command in R that yields a scatter plot).
+
+```{r}
+# Scatter plot of ln(percent bachelor's degrees) vs. ln(median house value).
+plot_LNPCTBACHMORE <- ggplot(regress_data, aes(x = LNPCTBACHMORE, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Percent Bachelor's Degree vs. Median House Value",
+       x = "Percent Bachelor's Degree",
+       y = "Median House Value") +
+  theme_gray()
+
+plot_LNPCTBACHMORE
+```
+
+```{r}
+# Scatter plot of ln(number households in poverty) vs. ln(median house value).
+plot_LNNBELPOV100 <- ggplot(regress_data, aes(x = LNNBELPOV100, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Number Households in Poverty vs. Median House Value",
+       x = "Number Households in Poverty",
+       y = "Median House Value") +
+  theme_gray()
+
+plot_LNNBELPOV100
+```
+
+```{r}
+# Scatter plot of ln(percent vacant units) vs. ln(median house value).
+plot_LNPCTVACANT <- ggplot(regress_data, aes(x = LNPCTVACANT, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Percent Vacant Units vs. Median House Value",
+       x = "Percent Vacant Units",
+       y = "Median House Value") +
+  theme_gray()
+
+plot_LNPCTVACANT
+```
+
+```{r}
+# Scatter plot of ln(detached single-family homes) vs. ln(median house value).
+plot_LNPCTSINGLES <- ggplot(regress_data, aes(x = LNPCTSINGLES, y = LNMEDHVAL)) +
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "LOG: Percent Detached Single-Family Homes vs. Median House Value",
+       x = "Percent Detached Single-Family Homes",
+       y = "Median House Value") +
+  theme_gray()
+
+plot_LNPCTSINGLES
+```
+
+**1bi.** In your report, you will be expected to present all four scatter plots as a single figure.
+
+```{r}
+# Create combined scatter plots with 2 rows and 2 columns.
+plots_combined <- plot_grid(plot_LNPCTBACHMORE, plot_LNNBELPOV100, plot_LNPCTVACANT, plot_LNPCTSINGLES, ncol = 2, nrow = 2)
+
+# Display plots with annotation.
+plots_combined + plot_annotation(
+  title = "NATURAL LOG: Median House Value Predictors",
+  subtitle = "Using % Bachelor's Degrees, # Households Below Poverty,\n% Vacant Units, % Detached Single-Family Homes"
+  )
+```
+
+**1c.** Look at the Pearson correlations between all the predictors you will be including in your model, listed below. Use the `cor` command or another command in R that computes Pearson correlations.
+
+Again, you may simply print the screen (Ctrl + Prt Scrn), and paste it into MS Paint. Then, you may cut out the relevant part (i.e., the correlation matrix) and paste it into your report.
+
+Note whether you observe severe multicollinearity, and whether it’s appropriate to include all 4 variables as predictors.
+
+Keep in mind that when you look at multicollinearity, you shouldn’t be including the dependent variable in the correlation matrix – that is, in a good predictive model, you want the correlation between each predictor and the dependent variable to be strong, and that’s not an issue.
+
+```{r}
+# 
+pearson_LNPCTBACHMORE <- cor(regress_data$LNPCTBACHMORE, regress_data$LNMEDHVAL, use = "everything", method = "pearson")
+
+pearson_LNPCTBACHMORE
+```
+
+```{r}
+pearson_LNNBELPOV100 <- cor(regress_data$LNNBELPOV100, regress_data$LNMEDHVAL, use = "everything", method = "pearson")
+
+pearson_LNNBELPOV100
+```
+
+```{r}
+pearson_LNPCTVACANT <- cor(regress_data$LNPCTVACANT, regress_data$LNMEDHVAL, use = "everything", method = "pearson")
+
+pearson_LNPCTVACANT
+```
+
+```{r}
+pearson_LNPCTSINGLES <- cor(regress_data$LNPCTSINGLES, regress_data$LNMEDHVAL, use = "everything", method = "pearson")
+
+pearson_LNPCTSINGLES
+```
+
+**Observations:**
+
+-   LNPCTBACHMORE = 0.4818251 (percent bachelor's degrees have a weak positive correlation with median household value)
+
+-   LNNBELPOV100 = -0.3255461 (number households in poverty have a weak negative correlation with median household value)
+
+-   LNPCTVACANT = -0.3205985 (percent vacant units have a weak negative correlation with median household value)
+
+-   LNPCTSINGLES = 0.01660472 (percent detached single-family homes have a weak positive correlation with median household value).
+
+0 ≤ \| r \| ≤ ±0.5: weak correlation
+
+±0.5 \< \| r \| \< ±0.8: moderate correlation
+
+±0.8 ≤ \| r \| \< ±1: strong correlation
+
+Above categories taken from class material "Lecture 3 - Hypothesis Testing - A Review".
+
+**1d.** Now use the `readOGR` command in the `rgdal` library in R (or another command in another R library of your choice) to import the shapefile and create choropleth maps of the following variables: **LNMEDHVAL**, **PCTVACANT**, **PCTSINGLES**, **PCTBACHMOR**, **LNNBELPOV100**.
+
+In your report, present the map of LNMEDHVAL as a single figure, and then combine the maps of the four predictors into a single figure (i.e., all 4 maps should be smaller and fit on 1 page as a single figure). Please use any color/classification scheme you see fit, as long as it is consistent for these five maps, and the remaining maps in the report.
+
+```{r}
+shapefile <- st_read("Lecture_1_RegressionData.shp/RegressionData.shp")
+
+choropleth_LNMEDHVAL <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = LNMEDHVAL), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(title = "Philadelphia Tracts: Log of Median House Value", fill = "Log of Median House Value") +
+  theme_void()
+
+ggsave("choropleth_LNMEDHVAL_map.png", plot = choropleth_LNMEDHVAL, width = 8.5, height = 11, units = "in", dpi = 600)
+
+choropleth_LNMEDHVAL
+```
+
+**Observations:** House values are much higher in northwest Philadelphia, likely because it's a suburb and encompasses Wissahickon Valley Park's vast green space, and proximity to greenery tends to increase property values in neighborhoods.
+
+```{r}
+choropleth_PCTVACANT <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = PCTVACANT), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "% Vacant Units") +
+  theme_void()
+
+choropleth_PCTVACANT
+```
+
+**Observations:** Looks like there are more vacant units clustered in northern Philadelphia, which many local Philadelphians anecdotally state possesses high rates of low-income populations and communities in poverty. Can see a similar gradient, although less stark, in southwest Philadelphia and the Mantua neighborhood in west Philadelphia.
+
+```{r}
+choropleth_PCTSINGLES <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = PCTSINGLES), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "% Detached Single-Family Homes") +
+  theme_void()
+
+choropleth_PCTSINGLES
+```
+
+**Observations:** Less rowhouse architecture in the periphery of Philadelphia, which seems to spatially coincide with the visual that displays the natural log of median household values. The city is majorly connected rowhouses or apartment buildings.
+
+```{r}
+choropleth_PCTBACHMOR <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = PCTBACHMOR), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "% Bachelor's Degrees") +
+  theme_void()
+
+choropleth_PCTBACHMOR
+```
+
+**Observations:** High concentrations of those with a bachelor's degree or more residing in Center City, Wissahickon, and University City areas, as well as the northwestern part of the county on the west side of the Schuylkill River that leads toward Bryn Mawr.
+
+```{r}
+choropleth_LNNBELPOV100 <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = LNNBELPOV), color = "black", linewidth = 0.25) +
+  scale_fill_viridis_c() +
+  labs(fill = "Households in Poverty") +
+  theme_void()
+
+choropleth_LNNBELPOV100
+```
+
+**Observations:** Many households in poverty seem to encompass areas that don't have detached single-family homes. Lots of noticeable clusters in north, west, and south Philadelphia.
+
+```{r}
+plots_combined <- plot_grid(choropleth_PCTVACANT, choropleth_PCTSINGLES, choropleth_PCTBACHMOR, choropleth_LNNBELPOV100, ncol = 2, nrow = 2)
+
+plots_combined + plot_annotation(
+  title = "Philadelphia Tracts",
+  subtitle = "Median House Value Predictors"
+  )
+
+ggsave("choropleth_combined_map.png", plot = plots_combined, width = 14, height = 8.5, units = "in", dpi = 300)
+
+plots_combined
+```
+
+## 2. REGRESSION ANALYSIS
+
+You are now done with the *exploratory analysis* of the data for this assignment. Note that here, you received data that have been cleaned. Typically, when you work with data, you need to make sure that you examine the variables for outliers and incorrectly coded/entered values. But now, you’re ready for regression analysis.
+
+**2a.** Assuming there’s no severe multicollinearity, use the `lm` command to run the regression where **LNMEDHVAL** is the dependent variable and **PCTVACANT**, **PCTSINGLES**, **PCTBACHMOR**, and **LNNBELPOV100** are predictors.
+
+```{r}
+# Regression analysis.
+regress_analysis <- lm(LNMEDHVAL ~ PCTVACANT + PCTSINGLES + PCTBACHMOR + LNNBELPOV100, regress_data)
+
+regress_analysis
+```
+
+**2b.** In your report, be sure to present the summary of the fit as well as the ANOVA table containing the regression and error sum of squares (use the `summary` and `anova` commands). The only thing you should be looking at in the output from the `anova` command is the error sum of squares, and not any of the p-values.
+
+```{r}
+# Summary of fit for regression analysis.
+regress_summary <- summary(regress_analysis)
+
+regress_summary
+```
+
+**Residuals Observations:** Residuals are differences between observed values and values predicted by regression model.
+
+-   *Min:* Value of -2.25825 is smallest residual. Means largest underestimation made by model was by that many units.
+
+-   *Q1 (First Quartile):* Value of -0.20391 means 25% of residuals are less than that value, and are points that are underestimations by the model.
+
+-   *Median:* Value of 0.04735 means 50% of residuals are less than that value, and other 50% are higher. Median near zero suggests, on whole, model is *not* systematically overestimating or underestimating.
+
+-   *Q3 (Third Quartile):* Value of 0.21744 means 75% of residuals are less than that value, and are points that are underestimations by the model.
+
+-   *Max:* Value of 2.24347 is largest residual. Means largest overestimation made by model was by that many units.
+
+**Coefficients Observations:**
+
+-   *Estimate:* Indicates expected change in dependent variable LNMEDHVAL for each one-unit increase in respective independent variable.
+
+-   *Intercept (Constant):* Y-intercept of regression line. Represents expected value of dependent variable when all independent variables are zero, so the dependent variable LNMEDHVAL is expected to be around 11.1137661.
+
+    -   P-Value is less than 0.001, so the null hypothesis that the coefficient of Intercept is zero in the population is rejected.
+
+-   *PCTVACANT:* If value of PCTVACANT changes by one unit, value of variable LNMEDHVAL changes by -0.0191569 units.
+
+    -   P-Value is less than 0.001, so the null hypothesis that the coefficient of PCTVACANT is zero in the population is rejected.
+
+-   *PCTSINGLES:* If value of PCTSINGLES changes by one unit, value of variable LNMEDHVAL changes by 0.0029769 units.
+
+    -   P-Value is less than 0.001, so the null hypothesis that the coefficient of PCTSINGLES is zero in the population is rejected.
+
+-   *PCTBACHMORE:* If value of PCTBACHMOR changes by one unit, value of variable LNMEDHVAL changes by 0.0209098 units.
+
+    -   P-Value is less than 0.001, so the null hypothesis that the coefficient of PCTBACHMORE is zero in the population is rejected.
+
+-   *LNNBELPOV100:* If value of PCTBACHMOR changes by one unit, value of variable LNMEDHVAL changes by -0.0789054 units.
+
+    -   P-Value is less than 0.001, so the null hypothesis that the coefficient of LNNBELPOV100 is zero in the population is rejected.
+
+**R Observations:**
+
+-   *R (Correlation Coefficient):* Correlation coefficient between observed values of dependent variable ln(median house value) and predictions made by model using independent variables. R value of \~0.81 (derived from taking square root of "multiple R-squared" or "adjusted R-squared") indicates very high positive correlation between observed values and prediction made by model.
+
+-   *R\^2 (R-Squared):* Proportion of variance in dependent variable that can be explained by independent variables in regression model. R\^2 value of 0.6623 means 66.23% of variance in dependent variable is explained by independent variables in model.
+
+-   *Adjusted R\^2:* Adjusts R\^2 value based on number of variables in model and number of observations. More accurate measure when there are multiple independent variables, like in this case. Suggests that after adjusting for number of predictors, value of 0.6615 means about 66.15% of variance in dependent variable is accounted for.
+
+-   *Standard Error of Estimate (Residual Standard Error):* Indicates average distance observed values fall from regression line (i.e. measure of accuracy of predictions made with regression model). Value of 0.3665 means that predicted values are, on average, 0.3665 units away from actual variables. **NOTE: Whether this value is a small or large error depends on the context and scale of the dependent variable.**
+
+-   *Summary:* Model shows very high positive relationship between observed values and prediction, explains 66.15% of variance in dependent variable, but predictions are on average 0.3665 units away from actual values, which may or may not be significant depending on context of data. In this case, the log of median house value is used, and in statistics this means the natural log (i.e. Euler's constant *base e* or *ln(x)*) So that means increasing x (or predictor variable) by 1% is almost equivalent to adding 0.01 to ln(x) according to "Lecture 3-9" slide #144; *"For any variable x, small changes in ln(x) may be interpreted as % change in x"*.
+
+```{r}
+# ANOVA.
+regress_anova <- anova(regress_analysis)
+
+regress_anova
+```
+
+**Observations:** ANOVA (Analysis of Variance) table in regression analysis helps understand how well model fits data.
+
+-   *Degrees of Freedom (df):* Indicates number of independent variables in model. There are 4 here, which are PCTVACANT (percent vacant units), PCTSINGLES (percent detached single-family homes), PCTBACHMOR (percent bachelor's degrees or more), and LNNBELPOV100 (log of number of households in poverty).
+
+-   *F-Statistic (F):* Tests overall significance of model. Compares model with no predictors (only intercept, also referred to as constant) with model specified. Value of 819.09 used with degrees of freedom to calculate p-value.
+
+-   *P-Value:* All values \<0.001, beyond the 0.001 threshold, so results are highly statistically significant. Can reject null hypothesis with high degree of confidence. Very unlikely observed results due to chance, indicating independent variables (predictors) in model have statistically significant effect on dependent variable LNMEDHVAL (log of median house values).
+
+**NOTE: HAVE TO "UN-LOG" THE VALUES WHEN INTERPRETING DATA.**
+
+**2c.** Use the `fitted`, `residuals`, and `rstandard` commands to save the predicted values, residuals and standardized residuals, respectively.
+
+```{r}
+# Fitted.
+regress_predicted <- fitted(regress_analysis)
+
+glimpse(regress_predicted)
+```
+
+```{r}
+# Residuals.
+regress_residuals <- residuals(regress_analysis)
+
+glimpse(regress_residuals)
+```
+
+```{r}
+# Standardized residuals.
+regress_standard_residuals <- rstandard(regress_analysis)
+
+glimpse(regress_standard_residuals)
+```
+
+```{r}
+# Creating new empty dataframe with 3 columns and 1,720 rows for above calculations to store and plot.
+predicted_residual_data <- data.frame(matrix(NA, nrow = 1720, ncol = 3))
+colnames(predicted_residual_data) <- c("R_PREDICTED", "R_RESIDUALS", "R_STANDARD")
+
+# Store calculated values into new dataframe.
+predicted_residual_data <- predicted_residual_data %>%
+  mutate(
+    R_PREDICTED = regress_predicted,
+    R_RESIDUALS = regress_residuals,
+    R_STANDARD = regress_standard_residuals
+    )
+
+predicted_residual_data
+```
+
+**2d.** Create a scatter plot with *Standardized Residuals* on the y-axis and *Predicted Values* on the x-axis. You will be asked to present this scatter plot in your report, so take a screenshot of it if you plan to use MS Word.
+
+```{r}
+# Scatter plot.
+predicted_residual_plot <- ggplot(predicted_residual_data, aes(x = R_PREDICTED, y = R_STANDARD)) + 
+  geom_point(size = 2, alpha = 0.3, color = "midnightblue") +
+  labs(title = "Predicted Values vs. Standardized Residuals", 
+       x = "Predicted Values", 
+       y = "Standardized Residuals") +
+  theme_gray()
+
+predicted_residual_plot
+```
+
+**Observations:** Points scattered on a residual plot at 0 on the y-axis (horizontal line) represents when the predicted value equals the actual value. Curved or heteroskedastic shape means the variables can't be explained linearly.
+
+## 3. STEPWISE REGRESSION
+
+Use the `step` and `step$anova` commands in the `MASS` library to run stepwise regression and determine the best model based on the Akaike Information Criterion. Take a screenshot of the `step$anova` output if you plan to use MS Word.
+
+```{r}
+library(MASS)
+
+step_model <- step(regress_analysis, direction = "both")
+
+step_model$anova
+```
+
+## 4. K-FOLD CROSS VALIDATION
+
+Perform k-fold cross-validation (in which k = 5) using the `CVlm` command in the `DAAG` library and calculate the root mean square error (RMSE). Then re-run the regression model only using **PCTVACANT** and **MEDHHINC** as predictors, and again perform k-fold cross-validation in which k = 5. You will be asked to present the RMSE of both this model and the original model in your report.
+
+```{r}
+library(DAAG)
+
+# Model 1
+fit1 <- lm(LNMEDHVAL ~ PCTVACANT + PCTSINGLES, data = regress_data)
+#summary(fit1)
+#anova(fit1)
+
+cv1 <- CVlm(data = regress_data, form.lm = fit1, m = 5, plotit = FALSE)
+
+# Extract MSE and compute RMSE
+mse1 <- attr(cv1, "ms")
+rmse1 <- sqrt(mse1)
+
+rmse1
+```
+
+```{r}
+# Model 2: LNMEDHVAL ~ PCTVACANT + MEDHHINC
+fit2 <- lm(LNMEDHVAL ~ PCTVACANT + MEDHHINC, data = regress_data)
+#summary(fit2)
+#anova(fit2)
+
+cv2 <- CVlm(data = regress_data, form.lm = fit2, m = 5, plotit = FALSE)
+
+mse2 <- attr(cv2, "ms")
+rmse2 <- sqrt(mse2)
+
+rmse2
+```
+
+## 5. VISUALIZATIONS
+
+Create a histogram and a choropleth map of standardized regression residuals that you saved using the `rstandard` command earlier. Use the same classification/color scheme as in your earlier maps.
+
+### 5a. Histogram
+
+```{r}
+hist_residuals <- ggplot(predicted_residual_data, aes(x = R_STANDARD)) +
+  geom_histogram(bins = 30, fill = "midnightblue", color = "white", alpha = 0.8) +
+  labs(title = "Histogram of Standardized Residuals",
+       x = "Standardized Residuals",
+       y = "Count") +
+  theme_minimal()
+
+hist_residuals
+ggsave("histogram_standardized_residuals.png", plot = hist_residuals, width = 8, height = 6, dpi = 300)
+```
+
+### 5b. Choropleth
+
+```{r}
+shapefile$residuals_standardized <- predicted_residual_data$R_STANDARD
+```
+
+```{r}
+choropleth_residuals <- ggplot() +
+  geom_sf(data = shapefile, aes(fill = residuals_standardized), color = "cornsilk2", linewidth = 0.25) +
+  scale_fill_viridis_c(option = "viridis") +
+  labs(title = "Choropleth of Standardized Regression Residuals",
+       fill = "Standardized Residuals") +
+  theme_void()
+
+choropleth_residuals
+ggsave("choropleth_standardized_residuals.png", plot = choropleth_residuals, width = 8.5, height = 11, dpi = 600)
+```
