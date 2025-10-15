@@ -16,7 +16,7 @@ The task is to explore the relationship between median house values and various 
 
 # 2. METHODS
 
-## Data Cleaning
+## a) Data Cleaning
 
 The original Philadelphia block group data set had 1,816 observations. The data was cleaned by removing the following block groups:
 
@@ -29,14 +29,13 @@ The original Philadelphia block group data set had 1,816 observations. The data 
 
 The final data set that was tested consists of 1,720 block groups.
 
-## Exploratory Data Analysis
+## b) Exploratory Data Analysis
 
--   **INSTRUCTIONS:** State that you will examine the summary statistics and distributions of variables.
--   **INSTRUCTIONS:** Also state that as part of your exploratory data analysis, you will examine the correlations between the predictors.
+Our purpose is to examine the summary statistics and distributions of the data. To achieve this, we start by creating histograms of each of the predictors to check for normal distribution and examining significant outliers.
 
-Our purpose is to examine the summary statistics and distributions of variables. As part of our exploratory data analysis, the correlations between the predictors are examined as well.
+As part of our exploratory data analysis, we also examine the correlations between the predictors to assess relationships among independent variables.
 
-A correlation coefficient is a standardized measure of the strength of the relationship between variables. The formula for calculating the correlation coefficient *r* is:
+A correlation coefficient is a statistical measure that quantifies the strength and direction of the linear relationship between two variables. The sample correlation coefficient r is calculated as: 
 
 $$
 r = \frac{\sum (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum (x_i - \bar{x})^2 \sum (y_i - \bar{y})^2}}
@@ -46,9 +45,8 @@ where x_i and y_i represent individual observations of the sample data and \bar{
 The value of correlation coefficient r ranges from −1 to +1. A value of r = +1 indicates a perfect positive linear relationship, in that all (x_i, y_i) pairs lie on a line with a positive slope, and r = −1 indicates a perfect negative linear relationship, in that all (x_i, y_i) pairs lie on a line with a negative slope. A value of r = 0 indicates a lack of linear relationship between the variables.     
 
 
-## Multiple Regression Analysis
+## c) Multiple Regression Analysis
 
--   **INSTRUCTIONS:** Describe the method of regression in several sentences. I.e., what is it used for, what does it do?
 -   **INSTRUCTIONS:** State the equation for y for this problem.
     -   In your report, instead of y and x1…xk, fill in the actual variable names (as in the regression example given above). Be sure to mention what βi’s and ε are as well. If the variables are log transformed, be sure to indicate that in the formulas.
 -   **INSTRUCTIONS:** State and explain regression assumptions (e.g., linearity; independence of observations; normality of residuals; homoscedasticity; no multicollinearity).
@@ -57,16 +55,20 @@ The value of correlation coefficient r ranges from −1 to +1. A value of r = +1
 -   **INSTRUCTIONS:** Talk about the coefficient of multiple determination R2, and the adjusted R2. Present and explain the relevant formulas and all the terms that are used in the formulas.
 -   **INSTRUCTIONS:** State the hypotheses you test. Specifically, talk about the F-ratio and the H0 and Ha associated with it, as well as the hypotheses you test about each of the individual βi’s (again, state H0 and Ha).
 
+Multiple linear regression is a method used to examine the relationship between a dependent variable and one or more explanatory variables. In other words, this method visualizes the relationship between a dependent variable Y and a set of predictors X_1, X_2, ..., X_k. Regression is used to predict the dependent variable based on the predictors, to test hypotheses about relationships between variables, and to understand which predictors are important in explaining the dependent variable. Each independent variable has its own slope coefficient, which indicates the relationship of that particular predictor with the dependent variable while controlling for all other independent variables in the regression. However, it is important to note that if an explanatory variable is a significant predictor of the dependent variable this *does not* imply causation.
+
 $$
 \log(\text{Median Home Value}) = \beta_0 + \beta_1(\text{Poverty}) + \beta_2(\text{Education}) + \beta_3(\text{Vacancy}) + \beta_4(\text{Single Units}) + \varepsilon
 $$
+In this equation, β0 is the intercept, representing the expected value of median house value when all predictors equal zero. The coefficients βi (for i=1,2,…,k) are the partial regression coefficients, indicating the change in median house value associated with a one-unit increase in predictor i, holding all other predictors constant. The variable ε is the residual or random error term in the model. Without ε, any observed pair (x,y) would fall exactly on the line y=β0+β1x_1 called the true (or population) regression line. The inclusion of the random error term ε allows (x,y) observations to fall either above the true regression line (when ε>0) or below the line (when ε<0). The points (x1,y1),(x2,y2),…,(xn,yn) resulting from *n* independent observations will then be scattered about the true regression line.
 
-## Additional Analyses
+
+## d) Additional Analyses
 
 -   **INSTRUCTIONS:** Talk about stepwise regression – discuss what it does and its limitations.
 -   **INSTRUCTIONS:** Talk about k-fold cross-validation (mentioning that k = 5) – discuss what it is used for, describe how it is operationalized and mention that the RMSE is used to compare models (explain what the RMSE is and how it is calculated, presenting and describing any relevant formulas).
 
-## Software
+## e) Software
 
 -   **INSTRUCTIONS:** State that you’re using R for your data analysis.
 
