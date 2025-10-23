@@ -1,0 +1,119 @@
+---
+title: "Spatial_Auto"
+format: html
+editor: visual
+---
+
+# **1. Spatial Lag and Spatial Error Regression**
+
+```{r}
+library(sf)
+library(dplyr)
+library(tibble)
+library(spdep)
+library(spgwr)
+library(tmap)
+library(spatialreg)
+library(whitestrap)
+library(lmtest)
+library(tseries)
+
+options(scipen=999)
+
+
+```
+
+```{r}
+#Read the Regression Data shp
+regress_data <- st_read("Lecture_1_RegressionData.shp/RegressionData.shp")
+```
+
+```{r}
+#Create variable PLUS1, defined as NBELPOV100+1
+#We already have LNNBELPOV and LNMEDHVAL in the shapefile (1.a.iv, 1.a.v in hw instructions)
+regress_data <- regress_data %>%
+  mutate(
+    PLUS1 = NBelPov100 + 1,
+  )
+
+#Before proceeding, let’s examine the distributions of our variables and see whether we need to create log transformations of any of them
+par(oma=c(0,0,2,0)) 
+par(mfrow=c(1,3)) 
+hist(regress_data$MEDHHINC, breaks = 50)
+hist(regress_data$MEDHVAL, breaks = 50)
+hist(regress_data$PCTVACANT, breaks = 50)
+
+#PCTVANCANT has a spike at 0, so not transformation for them. MEDHHINC and MEDHVAL will be transformed/they already exist in the regress_data gdf. 
+```
+
+```{r}
+#Graph of LNMED(HH)INC, LNMEDHVAL, and PCTVACANT
+par(oma=c(0,0,2,0)) 
+par(mfrow=c(1,3)) 
+hist(regress_data$LNMEDINC, breaks = 50)
+hist(regress_data$LNMEDHVAL, breaks = 50)
+hist(regress_data$PCTVACANT, breaks = 50)
+#I am making an assumption that LNMEDINC in the log of MEDHHINC. To reiterate, the LNMEDINC and LNMEDVHAL are present when you load the regress_data shp. 
+```
+
+## 2. Create a Queen Weight Matrix
+
+```{r}
+#defining neighbors for each of the block groups in philly using queen neighbors
+queen <- poly2nb(regress_data, row.names = regress_data$POLY_ID)
+summary(queen)
+```
+
+```{r}
+#It is useful to examine where block groups with non-average neighbor patterns are situated before we run spatial analyses. This is because these outlier block groups will affect our spatial analyses. We will look at the block groups where there is only 1 neighbor, and block groups where there are 27 neighbors. The block groups themselves will be colored in red, and their neighbors in green
+
+
+#see which region has only one neighbor
+smallestnbcard<-card(queen) #extract neighbor matrix
+smallestnb<-which(smallestnbcard == min(smallestnbcard)) #extract block groups with smallest number of neighbors
+fg<-rep('grey90', length(smallestnbcard))
+fg[smallestnb]<-'red' #color block groups red
+fg[queen[[smallestnb[1]]]]<-'green' #color neighboring blocks green
+fg[queen[[smallestnb[2]]]]<-'green'
+fg[queen[[smallestnb[3]]]]<-'green'
+fg[queen[[smallestnb[4]]]]<-'green'
+plot(regress_data$geometry, col=fg)
+title(main='Regions with only 1 neighbor')
+```
+
+```{r}
+#block group with most neighbors 
+largestnbcard<-card(queen)
+largestnb<-which(largestnbcard == max(largestnbcard))
+fg1<-rep('grey90', length(largestnbcard))
+fg1[largestnb]<-'red'
+fg1[queen[[largestnb]]]<-'green'
+plot(regress_data$geometry, col=fg1)
+title(main='Region with 27 neighbors')
+```
+
+## 3. Global Moran's I
+
+## 4. Local Moran's I
+
+## 5. OLS Regression (as in previous HW)
+
+## 6. Spatially Lagged Residuals
+
+## 7. Moran's I of OLS regression residuals
+
+## 8. Spatial Lag Regression (w/ Moran's I scatterplot of 99 permutations)
+
+## 9. Spatial Error Regression (w/ Moran's I scatterplot of 99 permutations)
+
+### 9a. Compare
+
+## 10. Geographically Weighted Regression (GWR)
+
+### 10a. Global Regression Output (global R\^2, AIC, AICc)
+
+### 10b. Choropeth map of local R\^2 values
+
+### 10c. Moran's I scatterplot and random permutations test for GWR residuals
+
+### 10d?. Follow slide instructions to map local regression results
