@@ -210,7 +210,11 @@ lisa_clusters
 First, let’s run an OLS regression. The logLik command prints the log likelihood. We can also run the same tests for heteroscedasticity and normality of residuals that we see in the GeoDa output.
 
 ```{r}
+# Fit an Ordinary Least Squares (OLS) regression model
+# Dependent variable: LNMEDINC (log of median income)
+# Independent variables: LNMEDHVAL (log of median home value) and PCTVACANT (percent of vacant housing)
 ols_reg<-lm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data)
+
 summary(ols_reg)
 ```
 ```{r}
@@ -236,7 +240,9 @@ jarque.bera.test(ols_reg$residuals)
 Now, let’s generate standardized residuals, which are OLS Model residuals divided by an estimate of their standard deviation, and map them. Visually, it certainly seems that there’s spatial autocorrelation in the residuals, with some higher values clustered in the northeast and northwest of the city, and some lower values clustered in north Philadelphia and downtown. However, a visual assessment is not sufficient, and we will test the presence of spatial autocorrelation in two ways: 1) by regressing residuals on their queen neighbors, and 2) by looking at the Moran’s I of the residuals.
 
 ```{r}
+# Compute standardized residuals from the OLS regression which makes residuals comparable across observations
 standardised_res<-rstandard(ols_reg)
+# For each observation, calculate the mean standardized residual of its neighbors to identify whether high or low residuals cluster spatially
 resnb<-sapply(queen_neighbors, function(x) mean(standardised_res[x]))
 
 regress_data$standardised_res <- standardised_res    #creating a new variable in the shapefile shp.
@@ -250,13 +256,26 @@ First, let’s regress the OLS standardized residuals on the spatial lag of the 
 ```{r}
 #Regressing residuals on their nearest neighbors.
 regress_res_lm <- lm(formula=standardised_res ~ resnb)
+
 summary(regress_res_lm)
 ```
 Again, we can use moran.mc to generate a Moran’s I statistic and a pseudo p-value.
 ```{r}
+# Perform a Monte Carlo test for Moran’s I on the standardized OLS residuals
+# Arguments:
+#  - standardised_res: residuals from the OLS model, standardized for comparability
+#  - queenlist: the spatial weights list (queen contiguity)
+#  - 999: number of random permutations (higher = more precise p-value)
+#  - alternative="two.sided": tests both positive and negative spatial autocorrelation
+
 moran.mc(standardised_res, queenlist, 999, alternative="two.sided")
 ```
 ```{r}
+# The plot shows the relationship between each observation’s residual and the average residuals of its neighboring observations
+# Arguments:
+#  - standardised_res: residuals from the OLS model, standardized for comparability
+#  - queenlist: the spatial weights list (queen contiguity)
+
 moran.plot(standardised_res, queenlist)
 ```
 From the above, it is strongly apparent that spatial autocorrelation exists among the regression residuals of the OLS Model. The p-value is very small indicating that Moran’s I is significant. Because there’s clearly spatial autocorrelation in OLS residuals, the OLS Model is inappropriate and we need to consider another method. Here, we will attempt to run the Spatial Lag Model, the Spatial Error Model, and Geographically Weighted Regression.
@@ -268,15 +287,59 @@ To fit a Spatial Lag Model, we can use the lagsarlm function. This function work
 From the results, we can see that the rho parameter (spatial lag of LNMEDHHINC), has a value of 0.44383 and is significant. We also get the AIC for the Spatial Lag Model (1207.8) which is substantially smaller than the AIC for the linear model (lm AIC = 1443.3). We also get the log likelihood (-598.91), which is higher (i.e., better) than the value we get in OLS using the loglik command (-717.6489). The LR.Sarlm command does a likelihood ratio test comparing the Spatial Lag Model to the OLS Model. The null hypothesis here is that the Spatial Lag Model isn’t better than OLS, which we can reject (p-value <0.00001).
 
 ```{r}
+# Dependent variable: LNMEDINC (log of median income)
+# Independent variables: LNMEDHVAL (log of median home value), PCTVACANT (percent vacant housing)
+# Spatial weights: queenlist (based on queen contiguity)
 lag_reg<-lagsarlm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data, queenlist)
+
 summary(lag_reg)
 ```
 ```{r}
 LR.Sarlm(lag_reg, ols_reg) #Here lagreg is the SL output; reg is the OLS output
 ```
+```{r}
+#Prints the results of the Breusch-Pagan Test to assess whether heteroscedasticity is present (package: lmtest)
+bptest.Sarlm(lag_reg, studentize=FALSE)
+```
+```{r}
+#Prints the results of the Koenker-Bassett Test (also known as the Studentized Breusch-Pagan Test) to assess whether heteroscedasticity is present (package: lmtest)
+bptest.Sarlm(lag_reg)  
+```
+```{r}
+#Prints the results of the Jarque-Bera Test to assess whether residuals are normal (package: tseries)
+jarque.bera.test(lag_reg$residuals)
+```
+Now, we can map the Spatial Lag Model residuals (which is an exercise left for the student) and look at the the Moran’s I of the Spatial Lag Model residuals. We see that these residuals from the Spatial Lag Model aren’t spatially autocorrelated, which is exactly what we were hoping to achieve.
+```{r}
+res_lag <- lag_reg$residuals
 
+# This checks whether any spatial autocorrelation remains after accounting for the spatial lag
+# Arguments:
+#  - res_lag: residuals from the spatial lag model
+#  - queenlist: spatial weights list (queen contiguity)
+#  - 999: number of random permutations for the Monte Carlo simulation
+#  - alternative="two.sided": tests both positive and negative spatial autocorrelation
+lag_moran_mc <- moran.mc(res_lag, queenlist,999, alternative="two.sided")
 
-## 7. Moran's I of OLS regression residuals
+lag_moran_mc
+```
+
+## 7. Regression Analysis: Spatial Error Regression
+
+To fit a Spatial Error Model, we use the errorsarlm function.
+
+Here, we see that lambda has the value of 0.45391 and is significant. We can also look at the AIC and the log likelihood. The AIC here is 1271.8, which is lower (better) than in OLS but higher (worse) than in the Spatial Lag Model. The log likelihood here is -630.899, which is higher than the value we see for OLS. The LR.Sarlm command does a likelihood ratio test comparing the Spatial Error Model to the OLS Model. The null hypothesis here is that the Spatial Error Model isn’t better than OLS, which we can reject (p-value <0.00001).
+
+```{r}
+error_reg <- errorsarlm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data, queenlist)
+# Extract residuals from the fitted spatial error model
+error_res <- residuals(error_reg)
+# Compute the mean residual value for each observation's neighbors
+error_res_mean <- sapply(queen_neighbors, function(x) mean(error_res[x]))
+
+summary(error_reg)
+```
+
 
 ## 8. Spatial Lag Regression (w/ Moran's I scatterplot of 99 permutations)
 
