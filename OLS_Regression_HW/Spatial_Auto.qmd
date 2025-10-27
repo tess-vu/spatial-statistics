@@ -7,6 +7,9 @@ editor: visual
 # **1. Spatial Lag and Spatial Error Regression**
 
 ```{r}
+#| eval: false
+#| echo: true
+
 library(sf)
 library(dplyr)
 library(tibble)
@@ -20,12 +23,11 @@ library(tseries)
 
 options(scipen=999)
 
-
 ```
 
 ```{r}
 #Read the Regression Data shp
-regress_data <- st_read("Lecture_1_RegressionData.shp/RegressionData.shp")
+regress_data <- st_read("data//RegressionData.shp")
 ```
 
 ```{r}
@@ -60,8 +62,8 @@ hist(regress_data$PCTVACANT, breaks = 50)
 
 ```{r}
 #defining neighbors for each of the block groups in philly using queen neighbors
-queen <- poly2nb(regress_data, row.names = regress_data$POLY_ID)
-summary(queen)
+queen_neighbors <- poly2nb(regress_data, row.names = regress_data$POLY_ID)
+summary(queen_neighbors)
 ```
 
 ```{r}
@@ -69,25 +71,25 @@ summary(queen)
 
 
 #see which region has only one neighbor
-smallestnbcard<-card(queen) #extract neighbor matrix
+smallestnbcard<-card(queen_neighbors) #extract neighbor matrix
 smallestnb<-which(smallestnbcard == min(smallestnbcard)) #extract block groups with smallest number of neighbors
 fg<-rep('grey90', length(smallestnbcard))
 fg[smallestnb]<-'red' #color block groups red
-fg[queen[[smallestnb[1]]]]<-'green' #color neighboring blocks green
-fg[queen[[smallestnb[2]]]]<-'green'
-fg[queen[[smallestnb[3]]]]<-'green'
-fg[queen[[smallestnb[4]]]]<-'green'
+fg[queen_neighbors[[smallestnb[1]]]]<-'green' #color neighboring blocks green
+fg[queen_neighbors[[smallestnb[2]]]]<-'green'
+fg[queen_neighbors[[smallestnb[3]]]]<-'green'
+fg[queen_neighbors[[smallestnb[4]]]]<-'green'
 plot(regress_data$geometry, col=fg)
 title(main='Regions with only 1 neighbor')
 ```
 
 ```{r}
 #block group with most neighbors 
-largestnbcard<-card(queen)
+largestnbcard<-card(queen_neighbors)
 largestnb<-which(largestnbcard == max(largestnbcard))
 fg1<-rep('grey90', length(largestnbcard))
 fg1[largestnb]<-'red'
-fg1[queen[[largestnb]]]<-'green'
+fg1[queen_neighbors[[largestnb]]]<-'green'
 plot(regress_data$geometry, col=fg1)
 title(main='Region with 27 neighbors')
 ```
@@ -96,15 +98,183 @@ title(main='Region with 27 neighbors')
 
 ```{r}
 #Choosing W as the style parameter, which will perform row standardization.
-queenlist <- nb2listw(queen, style = "W")
+queenlist <- nb2listw(queen_neighbors, style = "W")
+
 moran(regress_data$LNMEDINC, queenlist, n=length(queenlist$neighbours), S0 =Szero(queenlist))$"I"
+```
+
+```{r}
+# Check if this measure is statistically significant
+moranI_mc <- moran.mc(regress_data$LNMEDINC, queenlist, nsim=999, alternative="two.sided")  #We use 999 permutations
+moranI_mc
+
+```
+```{r}
+# Histogram of the Moran’s I values from random permutations
+moranI_mc_res<-moranI_mc$res
+hist(moranI_mc_res, freq=10000000, nclass=100)   #Draws distribution of Moran's I's calculated from randomly permuted values
+# Here, we draw a red vertical line at the observed value of our Moran's I
+abline(v=moran(regress_data$LNMEDINC, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I`, col='red')  
+```
+```{r}
+#Create Moran plot (lagged value against observed value)
+moran.plot(regress_data$LNMEDINC, queenlist) 
 ```
 
 ## 4. Local Moran's I
 
-## 5. OLS Regression (as in previous HW)
+The localmoran function allows us to compute LISA statistics for each block group. This function generates the Local Moran statistic as Ii. We might also be interested in Var.Ii, which tells us how much each block group’s Local Moran Statistic varies from the global mean, and Pr(z != E(Ii)), the p-value which indicates whether the Local Moran Statistic can be considered statistically significant.
 
-## 6. Spatially Lagged Residuals
+```{r}
+#Run local moran's I (LISA) 
+lmoran<-localmoran(regress_data$LNMEDINC, queenlist)
+head(lmoran)
+```
+```{r}
+# Combine the original regression dataset with the Local Moran's I results so that each observation includes its corresponding local spatial statistic
+lmoran_df <-cbind(regress_data, as.data.frame(lmoran))
+```
+
+We can create some maps using the tmap package. Specifically, we can create the p-value map and the cluster map, as in GeoDa. There’s a discussion of these and other maps available here: https://www.paulamoraga.com/book-spatial/spatial-autocorrelation.html.
+
+```{r}
+library(tmap)
+tmap_mode("plot")
+
+#Obtaining the Local Moran's P-Values (two-sided)
+regress_data$local_I <- lmoran[, "Pr(z != E(Ii))"]
+library(sf)
+regress_data <- st_make_valid(regress_data) #Sometimes necessary if projection is off
+
+
+#Creating the LISA Clusters
+moran_plot <- moran.plot(as.vector(scale(regress_data$LNMEDINC)), queenlist)
+```
+```{r}
+regress_data$quadrant <- NA
+# high-high
+regress_data[(moran_plot$x >= 0 & moran_plot$wx >= 0) & (regress_data$local_I <= 0.05), "quadrant"]<- 1
+# low-low
+regress_data[(moran_plot$x <= 0 & moran_plot$wx <= 0) & (regress_data$local_I <= 0.05), "quadrant"]<- 2
+# high-low
+regress_data[(moran_plot$x >= 0 & moran_plot$wx <= 0) & (regress_data$local_I <= 0.05), "quadrant"]<- 3
+# low-high
+regress_data[(moran_plot$x <= 0 & moran_plot$wx >= 0) & (regress_data$local_I <= 0.05), "quadrant"]<- 4
+# non-significant
+regress_data[(regress_data$local_I > 0.05), "quadrant"] <- 5
+```
+
+
+```{r}
+# LISA P-Value Map
+p_vals <- tm_shape(regress_data) +
+  tm_polygons(col = "local_I", title = "",
+              breaks = c(-Inf, 0.001, 0.01, 0.05, Inf),
+              palette = c("darkblue", "blue", "lightblue", "white")) +
+  tm_layout(
+    legend.outside = TRUE,
+    legend.text.size = 1,
+    legend.title.size = 1,
+    fontfamily = "Arial",
+    title = "LISA P-Value Map",
+    title.size = 1.2,
+    frame = FALSE
+  )
+
+p_vals
+```
+
+
+```{r}
+# LISA Cluster Map
+lisa_clusters <- tm_shape(regress_data) +
+  tm_fill(col = "quadrant", title = "",
+          breaks = c(1, 2, 3, 4, 5, 6),
+          palette = c("red", "blue", "lightpink", "skyblue2", "white"),
+          labels = c("High-High", "Low-Low", "High-Low", "Low-High", "Non-significant")) +
+  tm_borders(alpha = 0.5) +
+  tm_layout(
+    frame = FALSE,
+    legend.outside = TRUE,
+    legend.text.size = 1,
+    legend.title.size = 1,
+    fontfamily = "Arial",
+    title = "LISA Cluster Map",
+    title.size = 1.2
+  )
+
+lisa_clusters
+```
+
+## 5. Regression Analysis: OLS Regression
+First, let’s run an OLS regression. The logLik command prints the log likelihood. We can also run the same tests for heteroscedasticity and normality of residuals that we see in the GeoDa output.
+
+```{r}
+ols_reg<-lm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data)
+summary(ols_reg)
+```
+```{r}
+#Prints the log likelihood
+logLik(ols_reg)  
+```
+```{r}
+#Prints the results of the Breusch-Pagan Test to assess whether heteroscedasticity is present (package: lmtest)
+bptest(ols_reg, studentize=FALSE)
+```
+```{r}
+#Prints the results of the Koenker-Bassett Test (also known as the Studentized Breusch-Pagan Test) to assess whether heteroscedasticity is present (package: lmtest)
+bptest(ols_reg)
+```
+```{r}
+#Prints the results of the White Test to assess whether heteroscedasticity is present (package: whitestrap)
+white_test(ols_reg)   
+```
+```{r}
+# Prints the results of the Jarque-Bera Test to assess whether residuals are normal (package: tseries)
+jarque.bera.test(ols_reg$residuals)
+```
+Now, let’s generate standardized residuals, which are OLS Model residuals divided by an estimate of their standard deviation, and map them. Visually, it certainly seems that there’s spatial autocorrelation in the residuals, with some higher values clustered in the northeast and northwest of the city, and some lower values clustered in north Philadelphia and downtown. However, a visual assessment is not sufficient, and we will test the presence of spatial autocorrelation in two ways: 1) by regressing residuals on their queen neighbors, and 2) by looking at the Moran’s I of the residuals.
+
+```{r}
+standardised_res<-rstandard(ols_reg)
+resnb<-sapply(queen_neighbors, function(x) mean(standardised_res[x]))
+
+regress_data$standardised_res <- standardised_res    #creating a new variable in the shapefile shp.
+OLS.Residuals.Map<-tm_shape(regress_data)+
+  tm_fill(col='standardised_res', style='quantile', title='Standardized OLS Residuals', 
+          palette ='Blues')+
+  tm_layout(frame=FALSE, title = 'Standardised OLS Residuals')
+OLS.Residuals.Map
+```
+First, let’s regress the OLS standardized residuals on the spatial lag of the OLS residuals (i.e., OLS residuals at the queen neighbors). We can see that the beta coefficient of the lagged residuals is significant and positive (0.598, p<0.0001), meaning that there’s a significant level of spatial autocorrelation in the residuals. This is consistent with Moran’s I of the residuals we see below.
+```{r}
+#Regressing residuals on their nearest neighbors.
+regress_res_lm <- lm(formula=standardised_res ~ resnb)
+summary(regress_res_lm)
+```
+Again, we can use moran.mc to generate a Moran’s I statistic and a pseudo p-value.
+```{r}
+moran.mc(standardised_res, queenlist, 999, alternative="two.sided")
+```
+```{r}
+moran.plot(standardised_res, queenlist)
+```
+From the above, it is strongly apparent that spatial autocorrelation exists among the regression residuals of the OLS Model. The p-value is very small indicating that Moran’s I is significant. Because there’s clearly spatial autocorrelation in OLS residuals, the OLS Model is inappropriate and we need to consider another method. Here, we will attempt to run the Spatial Lag Model, the Spatial Error Model, and Geographically Weighted Regression.
+
+## 6. Regression Analysis: Spatial Lag Regression
+
+To fit a Spatial Lag Model, we can use the lagsarlm function. This function works similarly to the lm function we are familiar with. The only key difference lies in the need to specify a weight matrix (neighbor list) created using nb2listw function.
+
+From the results, we can see that the rho parameter (spatial lag of LNMEDHHINC), has a value of 0.44383 and is significant. We also get the AIC for the Spatial Lag Model (1207.8) which is substantially smaller than the AIC for the linear model (lm AIC = 1443.3). We also get the log likelihood (-598.91), which is higher (i.e., better) than the value we get in OLS using the loglik command (-717.6489). The LR.Sarlm command does a likelihood ratio test comparing the Spatial Lag Model to the OLS Model. The null hypothesis here is that the Spatial Lag Model isn’t better than OLS, which we can reject (p-value <0.00001).
+
+```{r}
+lag_reg<-lagsarlm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data, queenlist)
+summary(lag_reg)
+```
+```{r}
+LR.Sarlm(lag_reg, ols_reg) #Here lagreg is the SL output; reg is the OLS output
+```
+
 
 ## 7. Moran's I of OLS regression residuals
 
