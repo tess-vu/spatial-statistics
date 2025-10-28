@@ -609,7 +609,10 @@ aic_lag
 aic_error
 aic_gwr
 ```
+In addition, we can do the following to compare the Spatial Error Model to OLS:
 
+1. Compare the log likelihoods; the model with the higher value is the better one.
+2. Examine the results of the likelihood ratio test; if it’s significant, the Spatial Error Model is better than OLS.
 
 ```{r}
 # Compare Log-Likelihoods and Likelihood Ratio Tests.
@@ -630,7 +633,10 @@ lr_lag_vs_ols
 lr_error_vs_ols
 # Significant LR test (p < 0.05) = spatial model significantly improves on OLS.
 ```
+Lastly, we can also do the following to compare GWR to OLS:
 
+1.Compare the R2 from OLS with the Quasi-global R2 from GWR; the model with the higher value is the better one.
+2. Examine whether there’s spatial variability in standardized coefficients or local R2 values. If there is, it might mean that a single global regression might not capture the varying spatial relationships between the dependent variable and the predictors.
 
 ```{r}
 # Compare R-squared values (OLS vs. GWR) GWR = quasi-global R-squared to compare with OLS.
@@ -678,5 +684,14 @@ comparison <- data.frame(
 )
 
 comparison
+```
+```{r}
+# The R-squared of 0.63 for GWR is noticeably higher than OLS’s 0.44, suggesting that the relationships between median income and predictors vary across space. Mapping the local R-squared and standardized coefficients will reveal these spatial variations, confirming that a single global model doesn’t fully capture local dynamics.
+
+#The OLS model explains about 44% of the variance in median household income. However, residual diagnostics and Moran’s I indicate significant spatial autocorrelation, suggesting that OLS does not fully capture the spatial patterns in the data. 
+
+#The Spatial Lag and Spatial Error models improve model fit over OLS, as indicated by lower AIC values (1207.83 and 1271.80, respectively) and higher log-likelihoods.
+
+# GWR with an adaptive bandwidth provides the best overall fit, with the lowest AIC (1069.12) and a R² of 0.63. This confirms that a single global regression is insufficient to capture the nuanced spatial relationships, and GWR is better suited for modeling local variation.
 ```
 
