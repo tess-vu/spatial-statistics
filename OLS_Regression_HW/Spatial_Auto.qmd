@@ -492,6 +492,9 @@ tmap_arrange(coefLNMEDHVAL, coefPCTVACANT, ncol=2)
 
 ```
 ```{r}
+
+#The maps above are the ones using the exact code that our professor had but it looked funky so here is the code that I made to try and fix it.
+
 library(tmap)
 
 # Median House Value map
@@ -548,7 +551,7 @@ tmap_arrange(coefLNMEDHVAL, coefPCTVACANT, ncol = 2)
 And we can also look at the spatial distribution of the local R-squares. We can see that the two predictors do a good job explaining the variance in our dependent variable in NW Philadelphia, but not in many other parts of the city.
 
 ```{r}
-tm_shape(regress_spatial)+
+tm_shape(regress_data)+
   tm_fill(col='localR2',  breaks=c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7), n=5, palette = 'Blues')+
   tm_layout(frame=FALSE)
 
