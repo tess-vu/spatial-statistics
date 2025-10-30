@@ -100,12 +100,12 @@ title(main='Region with 27 neighbors')
 #Choosing W as the style parameter, which will perform row standardization.
 queenlist <- nb2listw(queen_neighbors, style = "W")
 
-moran(regress_data$LNMEDINC, queenlist, n=length(queenlist$neighbours), S0 =Szero(queenlist))$"I"
+moran(regress_data$LNMEDHVAL, queenlist, n=length(queenlist$neighbours), S0 =Szero(queenlist))$"I"
 ```
 
 ```{r}
 # Check if this measure is statistically significant
-moranI_mc <- moran.mc(regress_data$LNMEDINC, queenlist, nsim=999, alternative="two.sided")  #We use 999 permutations
+moranI_mc <- moran.mc(regress_data$LNMEDHVAL, queenlist, nsim=999, alternative="two.sided")  #We use 999 permutations
 moranI_mc
 
 ```
@@ -115,14 +115,14 @@ moranI_mc
 moranI_mc_res<-moranI_mc$res
 hist(moranI_mc_res, freq=10000000, nclass=100)   #Draws distribution of Moran's I's calculated from randomly permuted values
 # Here, we draw a red vertical line at the observed value of our Moran's I
-abline(v=moran(regress_data$LNMEDINC, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I`, col='red')  
+abline(v=moran(regress_data$LNMEDHVAL, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I`, col='red')  
 ```
 
 **Monte Carlo Interpretation:** 0.55247 Moran's I value indicates strong positive spatial autocorrelation, so many of the block groups are clustered together with high-income areas aside other high-income areas and low-income areas aside other low-income areas. The histogram shows that the spatial pattern observed in Philadelphia's block groups (red line) are leagues beyond, and statistically significant, compared to the random permutations in the histogram. That is, there's a less than 1% chance that Philadelphia's positive spatial autocorrelation occurred by random chance.
 
 ```{r}
 #Create Moran plot (lagged value against observed value)
-moran.plot(regress_data$LNMEDINC, queenlist) 
+moran.plot(regress_data$LNMEDHVAL, queenlist) 
 ```
 
 **Moran's I Plot Interpretation:** Many of the observations seem to fit along the positive line running through the lower left low-low quadrant and the upper right high-high quadrant, which also indicates positive spatial autocorrelation.
@@ -133,7 +133,7 @@ The localmoran function allows us to compute LISA statistics for each block grou
 
 ```{r}
 #Run local moran's I (LISA) 
-lmoran<-localmoran(regress_data$LNMEDINC, queenlist)
+lmoran<-localmoran(regress_data$LNMEDHVAL, queenlist)
 head(lmoran)
 ```
 
@@ -155,7 +155,7 @@ regress_data <- st_make_valid(regress_data) #Sometimes necessary if projection i
 
 
 #Creating the LISA Clusters
-moran_plot <- moran.plot(as.vector(scale(regress_data$LNMEDINC)), queenlist)
+moran_plot <- moran.plot(as.vector(scale(regress_data$LNMEDHVAL)), queenlist)
 ```
 
 ```{r}
@@ -224,14 +224,14 @@ First, let’s run an OLS regression. The logLik command prints the log likeliho
 # Fit an Ordinary Least Squares (OLS) regression model
 # Dependent variable: LNMEDINC (log of median income)
 # Independent variables: LNMEDHVAL (log of median home value) and PCTVACANT (percent of vacant housing)
-ols_reg<-lm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data)
+ols_reg<-lm(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT, data=regress_data)
 
 summary(ols_reg)
 ```
 
-**Regression Interpretation:** We are predicting LNMEDINC (log of median income), the [y-hat_i], with predictors LNMEDHVAL (log of median house value) and PCTVACANT (percent vacancies), respectively [x_1i] and [x_2i].
+**Regression Interpretation:** We are predicting LNMEDINC (log of median income), the \[y-hat_i\], with predictors LNMEDHVAL (log of median house value) and PCTVACANT (percent vacancies), respectively \[x_1i\] and \[x_2i\].
 
-The expected percent of median income when all predictors are 0 is 5.650956%. However, this is an unrealistic baseline estimate. When it comes to LNMEDHVAL, the output indicates that a 1% increase in median home value is associated with a 0.421546% increase in median income, holding percent vacancies constant. With PCTVACANT, the output indicates that a 1% increase in vacancies is associated with a 0.009191% decrease in median income, holding median home value constant. Both predictors show p < 0.001, so their very low p-values indicate high statistic significance.
+The expected percent of median income when all predictors are 0 is 5.650956%. However, this is an unrealistic baseline estimate. When it comes to LNMEDHVAL, the output indicates that a 1% increase in median home value is associated with a 0.421546% increase in median income, holding percent vacancies constant. With PCTVACANT, the output indicates that a 1% increase in vacancies is associated with a 0.009191% decrease in median income, holding median home value constant. Both predictors show p \< 0.001, so their very low p-values indicate high statistic significance.
 
 The residuals, or the error between the predicted value and the observed value, look to be centered very near 0, so there's seemingly no bias when looking at just the numbers. However, residual plots to visualize any heteroscedasticity will need to be plotted. The residuals seem to deviate from -2.53728 to 1.26485, which signals somewhat more underestimation for this model than overestimation.
 
@@ -245,6 +245,7 @@ The residual standard error 0.3676 indicates that the model is, on average, off 
 #Prints the log likelihood
 logLik(ols_reg)  
 ```
+
 **Log Likelihood Interpretation:** The number of parameters, 4, indicate the response and two predictor variables along with the residual variance. This measures how well the predicted values match the observed data under assumed error distribution. A higher, or less negative value means a better fit for the data, whereas a lower, or more negative value, means a worse fit for the data. However, value is used as a comparison, so observing in isolation is not generally helpful.
 
 ```{r}
@@ -336,7 +337,7 @@ From the results, we can see that the rho parameter (spatial lag of LNMEDHHINC),
 # Dependent variable: LNMEDINC (log of median income)
 # Independent variables: LNMEDHVAL (log of median home value), PCTVACANT (percent vacant housing)
 # Spatial weights: queenlist (based on queen contiguity)
-lag_reg<-lagsarlm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data, queenlist)
+lag_reg<-lagsarlm(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT, data=regress_data, queenlist)
 
 summary(lag_reg)
 ```
@@ -383,7 +384,7 @@ To fit a Spatial Error Model, we use the errorsarlm function.
 Here, we see that lambda has the value of 0.45391 and is significant. We can also look at the AIC and the log likelihood. The AIC here is 1271.8, which is lower (better) than in OLS but higher (worse) than in the Spatial Lag Model. The log likelihood here is -630.899, which is higher than the value we see for OLS. The LR.Sarlm command does a likelihood ratio test comparing the Spatial Error Model to the OLS Model. The null hypothesis here is that the Spatial Error Model isn’t better than OLS, which we can reject (p-value \<0.00001).
 
 ```{r}
-error_reg <- errorsarlm(formula=LNMEDINC ~ LNMEDHVAL + PCTVACANT, data=regress_data, queenlist)
+error_reg <- errorsarlm(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT, data=regress_data, queenlist)
 # Extract residuals from the fitted spatial error model
 error_res <- residuals(error_reg)
 # Compute the mean residual value for each observation's neighbors
@@ -461,7 +462,7 @@ class (regress_spatial)
 #   - method = "aic": uses Akaike Information Criterion to select the optimal bandwidth
 #   - adapt = TRUE: uses an adaptive bandwidth (proportion of nearest neighbors)
 #     instead of a fixed distance bandwidth
-bandwidth <- gwr.sel(formula = LNMEDINC ~ LNMEDHVAL + PCTVACANT, 
+bandwidth <- gwr.sel(formula = LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT, 
               data = regress_spatial,
               method = "aic",
               adapt = TRUE)
@@ -475,7 +476,7 @@ We might also want to create a fixed bandwidth. Notice that the output values mo
 
 ```{r}
 #setting a fixed bandwidth
-bandwidth_fixed<-gwr.sel(formula=LNMEDINC~LNMEDHVAL+PCTVACANT, 
+bandwidth_fixed<-gwr.sel(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT, 
             data=regress_spatial,
             method = "aic",
             adapt = FALSE)
@@ -500,7 +501,7 @@ Below are the results using the adaptive bandwidth.
 #   - gweight = gwr.Gauss: applies a Gaussian weighting kernel to give nearer observations more influence
 #   - se.fit = TRUE: returns local standard errors for each coefficient estimate
 #   - hatmatrix = TRUE: stores diagnostic info for model evaluation (e.g., local R²)
-gwr_model<-gwr(formula=LNMEDINC~LNMEDHVAL+PCTVACANT,
+gwr_model<-gwr(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT,
               data=regress_spatial,
               adapt = bandwidth, #adaptive bandwidth determined by proportion of observations accounted for
               gweight=gwr.Gauss,
@@ -514,7 +515,7 @@ Below are the results using the fixed bandwidth.
 
 ```{r}
 # results using fixed bandwidth
-gwr_model_fixed<-gwr(formula=LNMEDINC~LNMEDHVAL+PCTVACANT,
+gwr_model_fixed<-gwr(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACANT,
               data=regress_spatial,
               bandwidth = bandwidth_fixed, #fixed bandwidth
               gweight=gwr.Gauss,
@@ -537,43 +538,76 @@ We can also map the standardized coefficients. The higher the absolute value of 
 
 ```{r}
 gwr_results <- as.data.frame(gwr_model$SDF)
-regress_data$coefLNMEDHVALst <- gwr_results$LNMEDHVAL/gwr_results$LNMEDHVAL_se
+
+# LNNBELPOV
+regress_data$coefLNNBELPOVst <- gwr_results$LNNBELPOV/gwr_results$LNNBELPOV_se
+
+# PCTBACHMOR
+regress_data$coefPCTBACHMORst <- gwr_results$PCTBACHMOR/gwr_results$PCTBACHMOR_se
+
+# PCTSINGLES
+regress_data$coefPCTSINGLESst <- gwr_results$PCTSINGLES/gwr_results$PCTSINGLES_se
+
+# PCTVACANT
 regress_data$coefPCTVACANTst <- gwr_results$PCTVACANT/gwr_results$PCTVACANT_se
 
 regress_data$gwrE <- gwr_results$gwr.e
 regress_data$localR2 <- gwr_results$localR2
-
-coefLNMEDHVAL<-tm_shape(regress_data)+
-  tm_fill(col='coefLNMEDHVALst', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of LNMEDHVAL', 
-          palette ='-RdBu')+
-  tm_layout(frame=FALSE, title = 'Median House Value (Log)')
-
-coefPCTVACANT<-tm_shape(regress_data)+
-  tm_fill(col='coefPCTVACANTst', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of PCTVACANT', 
-          palette='-RdBu')+
-  tm_layout(frame=FALSE, title = 'Percentage of Housing Vacant')
-
-tmap_arrange(coefLNMEDHVAL, coefPCTVACANT, ncol=2)
-
 ```
 
 ```{r}
+# LNNBELPOV
+coefLNNBELPOV<-tm_shape(regress_data)+
+  tm_fill(col='coefLNNBELPOVst', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized Coefficient of LNNBELPOV', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Number in Poverty (Log)')
+```
 
+```{r}
+# PCTBACHMOR
+coefPCTBACHMOR<-tm_shape(regress_data)+
+  tm_fill(col='coefPCTBACHMORst', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized Coefficient of PCTBACHMOR', 
+          palette='-RdBu')+
+  tm_layout(frame=FALSE, title = "Percent of Bachelor's or More")
+```
+
+```{r}
+# PCTSINGLES
+coefPCTSINGLES<-tm_shape(regress_data)+
+  tm_fill(col='coefPCTSINGLESst', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized Coefficient of PCTSINGLES', 
+          palette='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percent Single Detached Homes')
+```
+
+```{r}
+# PCTVACANT
+coefPCTVACANT<-tm_shape(regress_data)+
+  tm_fill(col='coefPCTVACANTst', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized Coefficient of PCTVACANT', 
+          palette='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percent of Vacancies')
+```
+
+```{r}
+# Combine maps
+tmap_arrange(coefLNNBELPOV, coefPCTBACHMOR, coefPCTSINGLES, coefPCTVACANT, ncol = 2, nrow = 2)
+```
+
+```{r}
 #The maps above are the ones using the exact code that our professor had but it looked funky so here is the code that I made to try and fix it.
 
 library(tmap)
 
-# Median House Value map
-coefLNMEDHVAL <- tm_shape(regress_data) +
+# LNNBELPOV
+coefLNNBELPOV <- tm_shape(regress_data) +
   tm_fill(
-    col = "coefLNMEDHVALst",
+    col = "coefLNNBELPOVst",
     breaks = c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf),
-    title = "Standardized Coef: LNMEDHVAL",
+    title = "Standardized Coef: LNNBELPOV",
     palette = "-RdBu"
   ) +
   tm_layout(
     frame = FALSE,
-    title = "Median House Value (Log)",
+    title = "Number in Poverty (Log)",
     title.position = c("center", "top"),
     title.size = 1.2,
     legend.position = c("RIGHT", "BOTTOM"),  # Inside map, bottom right
@@ -584,18 +618,20 @@ coefLNMEDHVAL <- tm_shape(regress_data) +
     legend.title.size = 0.6,
     inner.margins = c(0.1, 0.15, 0.1, 0.15)  # top, right, bottom, left
   )
+```
 
-# Vacancy map
-coefPCTVACANT <- tm_shape(regress_data) +
+```{r}
+# PCTBACHMOR
+coefPCTBACHMOR <- tm_shape(regress_data) +
   tm_fill(
-    col = "coefPCTVACANTst",
+    col = "coefPCTBACHMORst",
     breaks = c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf),
-    title = "Standardized Coef: PCTVACANT",
+    title = "Standardized Coef: PCTBACHMOR",
     palette = "-RdBu"
   ) +
   tm_layout(
     frame = FALSE,
-    title = "Percentage of Housing Vacant",
+    title = "Percent of Bachelor's or More",
     title.position = c("center", "top"),
     title.size = 1.2,
     legend.position = c("RIGHT", "BOTTOM"),
@@ -606,11 +642,57 @@ coefPCTVACANT <- tm_shape(regress_data) +
     legend.title.size = 0.6,
     inner.margins = c(0.1, 0.15, 0.1, 0.15)
   )
+```
 
-tmap_arrange(coefLNMEDHVAL, coefPCTVACANT, ncol = 2)
+```{r}
+coefPCTSINGLES <- tm_shape(regress_data) +
+  tm_fill(
+    col = "coefPCTSINGLESst",
+    breaks = c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf),
+    title = "Standardized Coef: PCTSINGLES",
+    palette = "-RdBu"
+  ) +
+  tm_layout(
+    frame = FALSE,
+    title = "Percent of Single Detached Homes (Log)",
+    title.position = c("center", "top"),
+    title.size = 1.2,
+    legend.position = c("RIGHT", "BOTTOM"),  # Inside map, bottom right
+    legend.just = c("right", "bottom"),
+    legend.bg.color = "white",
+    legend.bg.alpha = 0.9,
+    legend.text.size = 0.6,
+    legend.title.size = 0.6,
+    inner.margins = c(0.1, 0.15, 0.1, 0.15)  # top, right, bottom, left
+  )
+```
 
+```{r}
+# PCTVACANT
+coefPCTVACANT <- tm_shape(regress_data) +
+  tm_fill(
+    col = "coefPCTVACANTst",
+    breaks = c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf),
+    title = "Standardized Coef: PCTVACANT",
+    palette = "-RdBu"
+  ) +
+  tm_layout(
+    frame = FALSE,
+    title = "Percent of Vacancies",
+    title.position = c("center", "top"),
+    title.size = 1.2,
+    legend.position = c("RIGHT", "BOTTOM"),
+    legend.just = c("right", "bottom"),
+    legend.bg.color = "white",
+    legend.bg.alpha = 0.9,
+    legend.text.size = 0.6,
+    legend.title.size = 0.6,
+    inner.margins = c(0.1, 0.15, 0.1, 0.15)
+  )
+```
 
-
+```{r}
+tmap_arrange(coefLNNBELPOV, coefPCTBACHMOR, coefPCTSINGLES, coefPCTVACANT, ncol = 2, nrow = 2)
 ```
 
 And we can also look at the spatial distribution of the local R-squares. We can see that the two predictors do a good job explaining the variance in our dependent variable in NW Philadelphia, but not in many other parts of the city.
@@ -697,7 +779,7 @@ Lastly, we can also do the following to compare GWR to OLS:
 r2_ols <- summary(ols_reg)$r.squared 
 
 # OLS comes with the R-squared value, but gwr does not. We need to calculate the R-squared value
-y <- regress_data$LNMEDINC # Dependent variable vector
+y <- regress_data$LNMEDHVAL # Dependent variable vector
 r2_gwr <- 1 - (gwr_model$results$rss / sum((y - mean(y))^2))
 
 ```
