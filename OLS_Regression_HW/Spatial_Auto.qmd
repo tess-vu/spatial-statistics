@@ -287,11 +287,20 @@ standardised_res<-rstandard(ols_reg)
 resnb<-sapply(queen_neighbors, function(x) mean(standardised_res[x]))
 
 regress_data$standardised_res <- standardised_res    #creating a new variable in the shapefile shp.
-OLS.Residuals.Map<-tm_shape(regress_data)+
-  tm_fill(col='standardised_res', style='quantile', title='Standardized OLS Residuals', 
+```
+
+```{r}
+OLS.Residuals.Map <- tm_shape(regress_data)+
+  tm_fill(col='standardised_res', 
+          style='quantile', 
+          title='Standardized OLS Residuals', 
           palette ='Blues')+
-  tm_layout(frame=FALSE, title = 'Standardised OLS Residuals')
+  tm_borders(col = "gray", lwd = 0.5) +  # Add this line
+  tm_layout(frame=FALSE, title='Standardized OLS Residuals')
+
 OLS.Residuals.Map
+
+#tmap_save(OLS.Residuals.Map, filename = "HW2_Plots/OLS_Residuals_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 First, let’s regress the OLS standardized residuals on the spatial lag of the OLS residuals (i.e., OLS residuals at the queen neighbors). We can see that the beta coefficient of the lagged residuals is significant and positive (0.598, p\<0.0001), meaning that there’s a significant level of spatial autocorrelation in the residuals. This is consistent with Moran’s I of the residuals we see below.
@@ -596,7 +605,9 @@ tmap_arrange(coefLNNBELPOV, coefPCTBACHMOR, coefPCTSINGLES, coefPCTVACANT, ncol 
 #The maps above are the ones using the exact code that our professor had but it looked funky so here is the code that I made to try and fix it.
 
 library(tmap)
+```
 
+```{r}
 # LNNBELPOV
 coefLNNBELPOV <- tm_shape(regress_data) +
   tm_fill(
@@ -605,19 +616,24 @@ coefLNNBELPOV <- tm_shape(regress_data) +
     title = "Standardized Coef: LNNBELPOV",
     palette = "-RdBu"
   ) +
+  tm_borders(col = "gray", lwd = 0.5) +
   tm_layout(
     frame = FALSE,
-    title = "Number in Poverty (Log)",
+    #title = "Percent of Number in Poverty (Log)",
     title.position = c("center", "top"),
     title.size = 1.2,
-    legend.position = c("RIGHT", "BOTTOM"),  # Inside map, bottom right
+    legend.position = c("RIGHT", "BOTTOM"),
     legend.just = c("right", "bottom"),
     legend.bg.color = "white",
     legend.bg.alpha = 0.9,
     legend.text.size = 0.6,
     legend.title.size = 0.6,
-    inner.margins = c(0.1, 0.15, 0.1, 0.15)  # top, right, bottom, left
+    inner.margins = c(0.1, 0.15, 0.1, 0.15)
   )
+
+coefLNNBELPOV
+
+#tmap_save(coefLNNBELPOV, filename = "HW2_Plots/coefLNNBELPOV_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 ```{r}
@@ -629,9 +645,10 @@ coefPCTBACHMOR <- tm_shape(regress_data) +
     title = "Standardized Coef: PCTBACHMOR",
     palette = "-RdBu"
   ) +
+  tm_borders(col = "gray", lwd = 0.5) +
   tm_layout(
     frame = FALSE,
-    title = "Percent of Bachelor's or More",
+    #title = "Percent of Bachelor's or More",
     title.position = c("center", "top"),
     title.size = 1.2,
     legend.position = c("RIGHT", "BOTTOM"),
@@ -642,6 +659,10 @@ coefPCTBACHMOR <- tm_shape(regress_data) +
     legend.title.size = 0.6,
     inner.margins = c(0.1, 0.15, 0.1, 0.15)
   )
+
+coefPCTBACHMOR
+
+#tmap_save(coefPCTBACHMOR, filename = "HW2_Plots/coefPCTBACHMOR_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 ```{r}
@@ -652,19 +673,24 @@ coefPCTSINGLES <- tm_shape(regress_data) +
     title = "Standardized Coef: PCTSINGLES",
     palette = "-RdBu"
   ) +
+  tm_borders(col = "gray", lwd = 0.5) +
   tm_layout(
     frame = FALSE,
-    title = "Percent of Single Detached Homes (Log)",
+    #title = "Percent of Detached Single Homes",
     title.position = c("center", "top"),
     title.size = 1.2,
-    legend.position = c("RIGHT", "BOTTOM"),  # Inside map, bottom right
+    legend.position = c("RIGHT", "BOTTOM"),
     legend.just = c("right", "bottom"),
     legend.bg.color = "white",
     legend.bg.alpha = 0.9,
     legend.text.size = 0.6,
     legend.title.size = 0.6,
-    inner.margins = c(0.1, 0.15, 0.1, 0.15)  # top, right, bottom, left
+    inner.margins = c(0.1, 0.15, 0.1, 0.15)
   )
+
+coefPCTSINGLES
+
+#tmap_save(coefPCTSINGLES, filename = "HW2_Plots/coefPCTSINGLES_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 ```{r}
@@ -676,9 +702,10 @@ coefPCTVACANT <- tm_shape(regress_data) +
     title = "Standardized Coef: PCTVACANT",
     palette = "-RdBu"
   ) +
+  tm_borders(col = "gray", lwd = 0.5) +
   tm_layout(
     frame = FALSE,
-    title = "Percent of Vacancies",
+    #title = "Percent of Vacancies",
     title.position = c("center", "top"),
     title.size = 1.2,
     legend.position = c("RIGHT", "BOTTOM"),
@@ -689,19 +716,37 @@ coefPCTVACANT <- tm_shape(regress_data) +
     legend.title.size = 0.6,
     inner.margins = c(0.1, 0.15, 0.1, 0.15)
   )
+
+coefPCTVACANT
+
+#tmap_save(coefPCTVACANT, filename = "HW2_Plots/coefPCTVACANT_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 ```{r}
-tmap_arrange(coefLNNBELPOV, coefPCTBACHMOR, coefPCTSINGLES, coefPCTVACANT, ncol = 2, nrow = 2)
+arranged_coef <- tmap_arrange(coefLNNBELPOV, coefPCTBACHMOR, coefPCTSINGLES, coefPCTVACANT, ncol = 2, nrow = 2)
+
+arranged_coef
+
+#tmap_save(arranged_coef, filename = "HW2_Plots/arranged_coef_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 And we can also look at the spatial distribution of the local R-squares. We can see that the two predictors do a good job explaining the variance in our dependent variable in NW Philadelphia, but not in many other parts of the city.
 
 ```{r}
-tm_shape(regress_data)+
-  tm_fill(col='localR2',  breaks=c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7), n=5, palette = 'Blues')+
+map <- tm_shape(regress_data)+
+  tm_fill(col='localR2', 
+          breaks=c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7), 
+          n=5, 
+          palette = 'Blues',
+          title = expression(Local~R^2)) +  # Add custom legend title
+  tm_borders(col = "white", lwd = 0.5) +
   tm_layout(frame=FALSE)
 
+map
+```
+```{r}
+# Save it
+#tmap_save(map, filename = "HW2_Plots/LocalR2_Map.png", width = 8, height = 8, dpi = 300)
 ```
 
 Finally, we can also look at the spatial autocorrelation in GWR residuals. This exercise is left for the student (spoiler alert: there’s much less autocorrelation in GWR residuals than in OLS residuals). Note that the residuals are extracted above using the command shp$gwrE<-gwrresults$gwr.e.
