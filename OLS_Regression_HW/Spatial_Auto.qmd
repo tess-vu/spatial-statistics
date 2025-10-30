@@ -535,6 +535,18 @@ gwr_model<-gwr(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + PCTVACA
 gwr_model
 ```
 
+```{r}
+# GWR adaptive moran's i
+gwr_adaptive_residuals <- gwr_model$SDF$gwr.e
+
+gwr_moran_mc <- moran.mc(gwr_adaptive_residuals, queenlist, nsim = 999)
+gwr_moran_mc
+```
+```{r}
+# GWR adaptive moran's i plot
+gwr_adaptive_plot <- moran.plot(gwr_adaptive_residuals, queenlist)
+```
+
 Below are the results using the fixed bandwidth.
 
 ```{r}
@@ -547,6 +559,18 @@ gwr_model_fixed<-gwr(formula=LNMEDHVAL ~ LNNBELPOV + PCTBACHMOR + PCTSINGLES + P
               hatmatrix = TRUE)
 
 gwr_model_fixed
+```
+
+```{r}
+# GWR adaptive moran's i
+gwr_fixed_residuals <- gwr_model_fixed$SDF$gwr.e
+
+gwr_moran_mc <- moran.mc(gwr_fixed_residuals, queenlist, nsim = 999)
+gwr_moran_mc
+```
+```{r}
+# GWR adaptive moran's i plot
+gwr_adaptive_plot <- moran.plot(gwr_fixed_residuals, queenlist)
 ```
 
 Notice that when we construct our GWR Model, the output from gwr.sel (where adapt=TRUE) should be specified for the parameter adapt. On the other hand, if we were interested in a fixed bandwidth, the output from gwr.sel (where adapt=FALSE) should be specified for the parameter bandwidth. Also notice the difference in the results. We seem to be getting a better fit (based on AIC), less error (based on Residual sum of squares), and a slightly better global R2 using the GWR Model with an adaptive bandwidth. Keep in mind that when comparing the GWR Model to OLS, Spatial Lag and Spatial Error, you should use the AIC and not the AICc.
@@ -577,6 +601,10 @@ regress_data$coefPCTVACANTst <- gwr_results$PCTVACANT/gwr_results$PCTVACANT_se
 
 regress_data$gwrE <- gwr_results$gwr.e
 regress_data$localR2 <- gwr_results$localR2
+```
+
+```{r}
+gwr_results
 ```
 
 ```{r}
