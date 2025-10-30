@@ -564,6 +564,7 @@ gwr_adaptive_residuals <- gwr_model$SDF$gwr.e
 gwr_moran_mc <- moran.mc(gwr_adaptive_residuals, queenlist, nsim = 999)
 gwr_moran_mc
 ```
+
 ```{r}
 # GWR adaptive moran's i plot
 gwr_adaptive_plot <- moran.plot(gwr_adaptive_residuals, queenlist)
@@ -590,6 +591,7 @@ gwr_fixed_residuals <- gwr_model_fixed$SDF$gwr.e
 gwr_moran_mc <- moran.mc(gwr_fixed_residuals, queenlist, nsim = 999)
 gwr_moran_mc
 ```
+
 ```{r}
 # GWR adaptive moran's i plot
 gwr_adaptive_plot <- moran.plot(gwr_fixed_residuals, queenlist)
