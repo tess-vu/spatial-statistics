@@ -109,11 +109,41 @@ for (var in predictors) {
 *2.b.iii.* In your report, you will be asked to present the cross-tabulations from *2.b.i* and *2.b.ii* in a table.
 
 ```{r 2.b.iii table}
-kable(
-  binary_results,
-  digits = 3,
-  caption = "Binary Predictors: Counts of 1s by DRINKING_D, total 1s, and Chi-square test results."
+# Build summary table.
+binary_summary <- data.frame(
+  Predictor = character(),
+  DRINKING_D = integer(),
+  Count_1 = integer(),
+  Percent_1 = numeric(),
+  Total_1 = integer(),
+  stringsAsFactors = FALSE
 )
+
+for (var in predictors) {
+  tab <- table(DRINKING_D = cdc_data$DRINKING_D,
+               Predictor   = cdc_data[[var]])
+  row_props <- prop.table(tab, 1)
+  total_1 <- sum(tab[, "1"])
+
+  for (d in rownames(tab)) {
+    binary_summary <- rbind(
+      binary_summary,
+      data.frame(
+        Predictor  = var,
+        DRINKING_D = as.integer(d),
+        Count_1    = as.integer(tab[d, "1"]),
+        Percent_1  = 100 * as.numeric(row_props[d, "1"]),
+        Total_1    = total_1
+      )
+    )
+  }
+}
+
+binary_summary$DRINKING_D <- ifelse(
+  binary_summary$DRINKING_D == 0, "No Alcohol", "Alcohol"
+)
+
+kable(binary_summary, digits = 2)
 ```
 
 *2.b.iv.* Prior to doing predictive modeling, statisticians often use the Chi-Square (χ2) test to determine whether the distribution of one categorical variable varies with respect to the values of another categorical variable. If we were to look at a cross-tabulation of the variables `DRINKING_D` and `FATAL_OR_M`, the null and alternative hypotheses for the χ2 test would be as follows:
@@ -151,7 +181,7 @@ kable(chi_results, digits = 4)
 
 *2.b.iv.3.* In the table *2.b.iii* above, add another column called “χ2 p-value”. For each row, present the p-value from the corresponding χ2 test.
 
-```{r 2.b.iii table}
+```{r 2.b.iii summary}
 binary_summary2 <- merge(binary_summary, chi_results, by = "Predictor")
 
 kable(binary_summary2, digits = 3)
@@ -298,19 +328,6 @@ kable(
   caption = "Sensitivity, Specificity, and Misclassification Across Cutoffs"
 )
 ```
-
-| Cut-Off Value | Sensitivity | Specificity | Misclassification Rate |
-|---------------|-------------|-------------|------------------------|
-| **0.02**      | 0.984       | 0.058       | 0.889                  |
-| **0.03**      | 0.981       | 0.064       | 0.884                  |
-| **0.05**      | 0.735       | 0.469       | 0.516                  |
-| **0.07**      | 0.221       | 0.914       | 0.126                  |
-| **0.08**      | 0.185       | 0.939       | 0.105                  |
-| **0.09**      | 0.168       | 0.946       | 0.099                  |
-| **0.10**      | 0.164       | 0.948       | 0.097                  |
-| **0.15**      | 0.104       | 0.972       | 0.078                  |
-| **0.20**      | 0.023       | 0.995       | 0.060                  |
-| **0.50**      | 0.002       | 1.000       | 0.057                  |
 
 : Sensitivity, Specificity, and Misclassification Table
 
