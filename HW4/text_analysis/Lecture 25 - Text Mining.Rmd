@@ -98,7 +98,7 @@ myCorpus <- tm_map(myCorpus, content_transformer(tolower))
 Let's look at lines 980-1000 of the first entry (document) in the corpus, which happens to be Tolstoy's War and Peace. (The first 600 or so lines include information about the ebook, and the Table of Contents.)
 
 ```{r warning=FALSE, message=FALSE, cache=FALSE}
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 Now that we have the data in a corpus, let's do some data cleaning, by converting a bunch of special characters (e.g., **@**, **/**, **]**, **$**) to a space and by removing apostrophes.
@@ -126,7 +126,7 @@ myCorpus <- tm_map(myCorpus, remApostrophe, "’")
 We can again look at the first entry of the corpus. Here, let's look at lines 980-1000.
 
 ```{r warning=FALSE, message=FALSE, cache=FALSE}
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 Now, let's remove numbers and punctuation.
@@ -134,7 +134,7 @@ Now, let's remove numbers and punctuation.
 ```{r warning=FALSE, message=FALSE, cache=FALSE}
 myCorpus <- tm::tm_map(myCorpus, removeNumbers)
 myCorpus <- tm_map(myCorpus, removePunctuation)
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 Now, let's look at a list of English stop words (e.g., _a_, _to_) that we can remove from the documents. Stop words are frequent terms that often don't provide a lot of useful information.
@@ -142,7 +142,7 @@ Now, let's look at a list of English stop words (e.g., _a_, _to_) that we can re
 ```{r warning=FALSE, message=FALSE, cache=FALSE}
 stopwords("english")
 myCorpus <- tm_map(myCorpus, removeWords, stopwords("english"))
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 We can also remove additional (i.e., self-defined) stop words, such as _ebook_ that appear in the first few lines of the text.
@@ -150,14 +150,14 @@ We can also remove additional (i.e., self-defined) stop words, such as _ebook_ t
 ```{r warning=FALSE, message=FALSE, cache=FALSE}
 myCorpus <- tm_map(myCorpus, removeWords,c("ebook", "author", "translators", 
                                            "start wwwgutenbergorg", "gutenberg", "chapter", "book", "contents"))
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 Lastly, depending on the problem, we can potentially play around with stemming. This removes common word suffixes and endings like _es_, _ed_, _ing_, etc. Alternatively, there is lemmatization, which groups together different inflected forms of the same word. Lemmatization can also be done in R.
 
 ```{r warning=FALSE, message=FALSE, cache=FALSE, eval=FALSE}
 myCorpus <- tm_map(myCorpus, stemDocument)
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 ## Term Document Matrix
@@ -207,7 +207,7 @@ for (i in seq(1, num_observations, chunk_size)) {
 Let's look at the terms that were dropped in myCorpus -- these are all the words that aren't in the Scrabble Dictionary (e.g., names like _Anatole_).
 
 ```{r warning=FALSE, message=FALSE, cache=FALSE}
-cat(content(myCorpus[[1]])[980:1000], sep = "\n")
+cat(as.character(myCorpus[[1]])[980:1000], sep = "\n")
 ```
 
 ## Document Term Matrix
