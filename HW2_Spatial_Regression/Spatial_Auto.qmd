@@ -1,5 +1,5 @@
 ---
-title: "Spatial_Auto"
+title: "Spatial Autocorrelation + GWR Regression Analysis"
 format: html
 editor: visual
 ---
