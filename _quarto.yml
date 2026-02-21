@@ -1,0 +1,26 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "MUSA 5000 Spatial Statistics and Data Mining Homework Repository"
+  description: "Portfolio of spatial statistics and data mining analyses including OLS regression, spatial autocorrelation, logistic regression, and text mining" 
+  navbar:
+    title: "MUSA 5000 Portfolio"
+    left:
+    - href: index.qmd
+      text: Home
+    - text: Homework Assignments
+      menu:
+        - href: HW1_OLS_Regression/OLS_Regression.qmd
+          text: Homework I - OLS Regression 
+
+format:
+  html:
+    theme: superhero
+    toc: true
+    code-fold: true
+    css: styles.css
+
+execute:
+  freeze: auto
